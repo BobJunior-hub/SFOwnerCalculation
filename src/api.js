@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://dev.smartfleetllc.com/api";
+const API_BASE_URL = "https://app.smartfleetllc.com/api";
 
 export const getAuthToken = () => {
   return localStorage.getItem("token") || sessionStorage.getItem("token");
