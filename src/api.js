@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://dev.smartfleetllc.com/api";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const getAuthToken = () => {
   return localStorage.getItem("token") || sessionStorage.getItem("token");
