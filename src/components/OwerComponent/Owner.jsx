@@ -1,4 +1,5 @@
 import { DeleteOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { App, Button, Card, Empty, Pagination, Spin } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../api';
@@ -7,6 +8,7 @@ import { useGetOwner } from '../../services/query/useGetOwner';
 
 export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawerOpen, setDeductionDrawerOpen, setSelectedCalculation, selectedOwner, onRefresh }) => {
   const { message, modal } = App.useApp();
+  const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [calculations, setCalculations] = useState([]);
@@ -79,9 +81,18 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
 
           message.success('Owner calculation deleted successfully');
 
+          // Invalidate and refetch the owner data
+          queryClient.invalidateQueries({ queryKey: ['owner'] });
+
+          // Also update local state immediately
           setCalculations(prev =>
             prev.filter(item => item.id !== owner.id)
           );
+
+          // Call onRefresh if provided
+          if (onRefresh) {
+            onRefresh();
+          }
 
         } catch (error) {
           console.error('Error deleting owner calculation:', error);

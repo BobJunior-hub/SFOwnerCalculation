@@ -765,7 +765,14 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                                 step={0.01}
                                 formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                                 parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                                style={{ color: currentTheme === 'dark' ? '#4ade80' : '#16a34a' }}
+                                style={{
+                                  color: (() => {
+                                    const amt = parseFloat(data.amount) || 0;
+                                    if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
+                                    if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+                                    return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                                  })()
+                                }}
                                 required={true}/>
                             </div>
                             <div>
@@ -839,31 +846,38 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                   showSearch
                       loading={loadingTrucks}
                   filterOption={(input, option) => {
-                        const label = option?.label ?? '';
                         const searchText = input.toLowerCase();
-                        return label.toLowerCase().includes(searchText) ||
-                               (option?.vin && option.vin.toLowerCase().includes(searchText)) ||
-                               (option?.unitNumber && option.unitNumber.toLowerCase().includes(searchText));
+                        const unitNumber = (option?.unitNumber || '').toLowerCase();
+                        const driverName = (option?.driverName || '').toLowerCase();
+                        return unitNumber.includes(searchText) || driverName.includes(searchText);
                   }}
                   options={filteredTrucks.map(truck => {
                     const truckId = truck.id || truck._id;
                     const unitNumber = truck.unit_number || 'N/A';
                     const vin = truck.VIN || truck.vin || 'N/A';
                         let driverId = null;
+                        let driverNames = [];
                         if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
                           driverId = truck.driver[0].id;
+                          driverNames = truck.driver
+                            .map((d) => d.full_name)
+                            .filter((name) => name && name.trim());
                         } else if (truck.driver && typeof truck.driver === 'object' && truck.driver.id) {
                           driverId = truck.driver.id;
+                          if (truck.driver.full_name) {
+                            driverNames = [truck.driver.full_name];
+                          }
                         } else if (truck.driver && typeof truck.driver === 'number') {
                           driverId = truck.driver;
                         } else if (truck.driver_id) {
                           driverId = truck.driver_id;
                         }
+                        const driverName = driverNames.join(' / ');
                         return {
                           value: String(truckId),
-                          label: `Unit ${unitNumber} (VIN: ${vin})${driverId ? ' - Driver Assigned' : ' - No Driver'}`,
+                          label: `Unit ${unitNumber}${driverName ? ` - ${driverName}` : ' - No Driver'}`,
                           unitNumber: unitNumber,
-                          vin: vin,
+                          driverName: driverName,
                         };
                       })}
                       notFoundContent={

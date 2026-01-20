@@ -425,7 +425,7 @@ const Owners = () => {
               )}
 
             <div className="flex items-center gap-2">
-              <span className="font-medium">Date Range:</span>
+              <span className="font-medium">Date Range :</span>
               <RangePicker
                 value={dateRange}
                 onChange={(dates) => {
@@ -433,6 +433,7 @@ const Owners = () => {
                     const startDate = dates[0];
                     let newDateRange;
                     if (dates[1]) {
+                      if (dates[1].isBefore(startDate, 'day')) return;
                       newDateRange = [startDate, dates[1]];
                     } else {
                       const endDate = startDate.clone().add(6, 'day');
@@ -459,6 +460,7 @@ const Owners = () => {
                     const startDate = dates[0];
                     let newDateRange;
                     if (dates[1]) {
+                      if (dates[1].isBefore(startDate, 'day')) return;
                       newDateRange = [startDate, dates[1]];
                     } else {
                       const endDate = startDate.clone().add(6, 'day');

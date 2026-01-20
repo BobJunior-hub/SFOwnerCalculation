@@ -80,15 +80,16 @@ const DashboardLayout = ({ children }) => {
 
   const items = [
     {
-      key: 'owners',
-      label: 'Owners',
-      icon: <TeamOutlined />,
-    },
-    {
       key: 'analytics',
       label: 'Analytics',
       icon: <BarChartOutlined />,
     },
+    {
+      key: 'owners',
+      label: 'Owners',
+      icon: <TeamOutlined />,
+    },
+
   ];
 
   const menuStyle = { height: '100%', borderRight: 0, overflowY: 'auto', flex: 1 };
@@ -153,7 +154,7 @@ const DashboardLayout = ({ children }) => {
                   <Text strong className="text-white block">
                     {user?.username || 'User'}
                   </Text>
-                  <Text type="secondary" className="text-xs text-white/70">
+                  <Text type="secondary" className="text-xs text-white/70 ">
                     {user?.department || ''}
                   </Text>
                 </div>
@@ -161,12 +162,10 @@ const DashboardLayout = ({ children }) => {
             </div>
             <Button
               type="text"
-              danger
               icon={<LogoutOutlined />}
               onClick={handleLogout}
               block
-              className="text-white text-left h-auto py-2 px-3"
-            >
+              className="text-xs !text-white hover:!text-red-500 text-left h-auto py-2 px-3 bg-white/10">
               {!collapsed && 'Logout'}
             </Button>
           </Space>

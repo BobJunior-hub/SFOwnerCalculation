@@ -2,7 +2,7 @@ import { CloseOutlined, DeleteOutlined, LoadingOutlined, PlusOutlined, SaveOutli
 import { useQueryClient } from '@tanstack/react-query';
 import { App, Button, DatePicker, Drawer, Input, InputNumber, Select } from 'antd';
 import dayjs from 'dayjs';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useOwner } from '../../hooks/useOwner';
 import { useTheme } from '../../menu';
 import { owners } from './helpers/owners';
@@ -29,6 +29,10 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
     isSubmitting,
     handleSubmit,
     resetForm,
+    selectedUnitValue,
+    setSelectedUnitValue,
+    start_date,
+    end_date,
   } = useOwner();
 
   const handleFormSubmit = async () => {
@@ -52,16 +56,85 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
     onClose();
   };
 
+  useEffect(() => {
+    if (!open) {
+      resetForm();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   return (
     <Drawer
       title={
-        <div>
-          <h2 className={`text-xl font-bold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-            Create New Owner Calculation
-          </h2>
-          <p className={`text-sm ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-            Calculate statements for specific trucks
-          </p>
+        <div className="flex items-start justify-between w-full pr-8">
+          <div>
+            <h2 className={`text-xl font-bold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
+              Create New Owner Calculation
+            </h2>
+            <p className={`text-sm ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+              Calculate statements for specific trucks
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`p-3 rounded-lg border ${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10 shadow-sm'}`}>
+              <div className="flex flex-col items-end">
+                <span className={`text-xs font-medium ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                  Total Amount of All Units
+                </span>
+                <span
+                  className={`text-lg font-bold mt-1 ${
+                    (() => {
+                      const totalSum = trucksData.reduce((sum, item) => {
+                        const amt = parseFloat(item.totalAmount) || 0;
+                        return sum + amt;
+                      }, 0);
+                      if (totalSum < 0) return currentTheme === 'dark' ? 'text-red-400' : 'text-red-600';
+                      if (totalSum > 0) return currentTheme === 'dark' ? 'text-green-400' : 'text-green-600';
+                      return currentTheme === 'dark' ? 'text-white/70' : 'text-black/70';
+                    })()
+                  }`}
+                >
+                  {(() => {
+                    const totalSum = trucksData.reduce((sum, item) => {
+                      const amt = parseFloat(item.totalAmount) || 0;
+                      return sum + amt;
+                    }, 0);
+                    const sign = totalSum < 0 ? '-' : '';
+                    return `${sign}$${Math.abs(totalSum).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+                  })()}
+                </span>
+              </div>
+            </div>
+            <div className={`p-3 rounded-lg border ${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10 shadow-sm'}`}>
+              <div className="flex flex-col items-end">
+                <span className={`text-xs font-medium ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                  Total Escrow of All Units
+                </span>
+                <span
+                  className={`text-lg font-bold mt-1 ${
+                    (() => {
+                      const totalEscrow = trucksData.reduce((sum, item) => {
+                        const amt = parseFloat(item.escrow) || 0;
+                        return sum + amt;
+                      }, 0);
+                      if (totalEscrow < 0) return currentTheme === 'dark' ? 'text-red-400' : 'text-red-600';
+                      if (totalEscrow > 0) return currentTheme === 'dark' ? 'text-blue-400' : 'text-blue-600';
+                      return currentTheme === 'dark' ? 'text-white/70' : 'text-black/70';
+                    })()
+                  }`}
+                >
+                  {(() => {
+                    const totalEscrow = trucksData.reduce((sum, item) => {
+                      const amt = parseFloat(item.escrow) || 0;
+                      return sum + amt;
+                    }, 0);
+                    const sign = totalEscrow < 0 ? '-' : '';
+                    return `${sign}$${Math.abs(totalEscrow).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+                  })()}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       }
       placement="right"
@@ -148,37 +221,23 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
             </div>
           </section>
 
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-orange-100 text-orange-600'
-                  }`}>
-                  2
-                </span>
-                <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-orange-600'}>Calculation Units</span>
-              </div>
-              <div className={`text-xs font-medium ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                {trucksData.length} Unit(s) selected
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {trucksData.length === 0 ? (
-                <div className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center text-center ${currentTheme === 'dark' ? 'border-white/10 bg-white/5' : 'border-black/10 bg-gray-50'
-                  }`}>
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${currentTheme === 'dark' ? 'bg-white/10 text-white/30' : 'bg-white text-gray-300 shadow-sm'
+          {trucksData.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-orange-100 text-orange-600'
                     }`}>
-                    <PlusOutlined style={{ fontSize: '24px' }} />
-                  </div>
-                  <p className={`font-medium ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
-                    No units added to this calculation yet.
-                  </p>
-                  <p className={`text-xs mt-1 ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                    Select units below to start calculations.
-                  </p>
+                    2
+                  </span>
+                  <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-orange-600'}>Calculation Units</span>
                 </div>
-              ) : (
-                trucksData.map((data) => (
+                <div className={`text-xs font-medium ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                  {trucksData.length} Unit(s) selected
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {trucksData.map((data) => (
                   <div
                     key={data.truckId}
                     className={`border rounded-lg p-4 transition-all ${currentTheme === 'dark'
@@ -246,47 +305,141 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                             placeholder="Enter company"
                           />
                         </div>
-                        <div>
-                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                            Total Amount <span className="text-red-500">*</span>
-                          </label>
-                          <InputNumber
-                            className="w-full"
-                            value={data.totalAmount ? parseFloat(data.totalAmount) : null}
-                            onChange={(value) => {
-                              if (value === null || value === undefined) {
-                                updateTruckData(data.truckId, 'totalAmount', '');
-                                return;
-                              }
-                              if (typeof value === 'number' && !isNaN(value)) {
-                                updateTruckData(data.truckId, 'totalAmount', String(value));
-                              }
-                            }}
-                            placeholder="Enter amount"
-                            step={0.01}
-                            controls={true}
-                            keyboard={true}
-                            formatter={(value) => {
-                              if (!value && value !== 0) return '';
-                              const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-                              if (isNaN(numValue)) return '';
-                              return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                            }}
-                            parser={(value) => {
-                              if (!value) return '';
-                              const cleaned = value.replace(/[^0-9.-]/g, '');
-                              const num = parseFloat(cleaned);
-                              return isNaN(num) ? '' : cleaned;
-                            }}
-                            onKeyPress={(e) => {
-                              const char = String.fromCharCode(e.which || e.keyCode);
-                              if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                            style={{ color: currentTheme === 'dark' ? '#4ade80' : '#16a34a', width: '100%' }}
-                          />
-                        </div>
+                        {data.drivers && data.drivers.length > 1 ? (
+                          <>
+                            {data.drivers.map((driver, index) => (
+                              <div key={driver.id || index}>
+                                <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                  {driver.full_name} Amount <span className="text-red-500">*</span>
+                                </label>
+                                <InputNumber
+                                  className="w-full"
+                                  value={driver.amount ? parseFloat(driver.amount) : null}
+                                  onChange={(value) => {
+                                    const updatedDrivers = [...(data.drivers || [])];
+                                    updatedDrivers[index] = {
+                                      ...updatedDrivers[index],
+                                      amount: value === null || value === undefined ? '' : String(value),
+                                    };
+                                    const totalAmount = updatedDrivers.reduce((sum, d) => {
+                                      const amt = parseFloat(d.amount) || 0;
+                                      return sum + amt;
+                                    }, 0);
+                                    updateTruckData(data.truckId, 'drivers', updatedDrivers);
+                                    updateTruckData(data.truckId, 'totalAmount', String(totalAmount));
+                                  }}
+                                  placeholder="Enter amount"
+                                  step={0.01}
+                                  controls={true}
+                                  keyboard={true}
+                                  formatter={(value) => {
+                                    if (!value && value !== 0) return '';
+                                    const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                                    if (isNaN(numValue)) return '';
+                                    return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                  }}
+                                  parser={(value) => {
+                                    if (!value) return '';
+                                    const cleaned = value.replace(/[^0-9.-]/g, '');
+                                    const num = parseFloat(cleaned);
+                                    return isNaN(num) ? '' : cleaned;
+                                  }}
+                                  onKeyPress={(e) => {
+                                    const char = String.fromCharCode(e.which || e.keyCode);
+                                    if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                      e.preventDefault();
+                                    }
+                                  }}
+                                  style={{
+                                    color: (() => {
+                                      const amt = parseFloat(driver.amount) || 0;
+                                      if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
+                                      if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+                                      return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                                    })(),
+                                    width: '100%'
+                                  }}
+                                />
+                              </div>
+                            ))}
+                            <div>
+                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                Total Amount <span className="text-red-500">*</span>
+                              </label>
+                              <InputNumber
+                                className="w-full"
+                                value={data.totalAmount ? parseFloat(data.totalAmount) : null}
+                                disabled={true}
+                                formatter={(value) => {
+                                  if (!value && value !== 0) return '';
+                                  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                                  if (isNaN(numValue)) return '';
+                                  return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                }}
+                                style={{
+                                  color: (() => {
+                                    const amt = parseFloat(data.totalAmount) || 0;
+                                    if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
+                                    if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+                                    return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                                  })(),
+                                  width: '100%',
+                                  backgroundColor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : '#f5f5f5'
+                                }}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                              Total Amount <span className="text-red-500">*</span>
+                            </label>
+                            <InputNumber
+                              className="w-full"
+                              value={data.totalAmount ? parseFloat(data.totalAmount) : null}
+                              onChange={(value) => {
+                                if (value === null || value === undefined) {
+                                  updateTruckData(data.truckId, 'totalAmount', '');
+                                  return;
+                                }
+                                if (typeof value === 'number' && !isNaN(value)) {
+                                  updateTruckData(data.truckId, 'totalAmount', String(value));
+                                }
+                              }}
+                              placeholder="Enter amount"
+                              step={0.01}
+                              controls={true}
+                              keyboard={true}
+                              formatter={(value) => {
+                                if (!value && value !== 0) return '';
+                                const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                                if (isNaN(numValue)) return '';
+                                return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                              }}
+                              parser={(value) => {
+                                if (!value) return '';
+                                const cleaned = value.replace(/[^0-9.-]/g, '');
+                                const num = parseFloat(cleaned);
+                                return isNaN(num) ? '' : cleaned;
+                              }}
+                              onKeyPress={(e) => {
+                                const char = String.fromCharCode(e.which || e.keyCode);
+                                if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                  e.preventDefault();
+                                }
+                              }}
+                              style={{
+                                color: (() => {
+                                  const amt = parseFloat(data.totalAmount) || 0;
+                                  if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
+                                  if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+                                  return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                                })(),
+                                width: '100%'
+                              }}
+                            />
+                          </div>
+                        )}
                         <div>
                           <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
                             Escrow
@@ -339,8 +492,7 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                               href={data.pdf}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`text-xs px-3 py-2 rounded border inline-block ${currentTheme === 'dark' ? 'border-white/20 text-white/70 hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                            >
+                              className={`text-xs px-3 py-2 rounded border inline-block ${currentTheme === 'dark' ? 'border-white/20 text-white/70 hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
                               View PDF
                             </a>
                           </div>
@@ -359,10 +511,10 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                       </div>
                     )}
                   </div>
-                ))
-              )}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className={`space-y-4 pt-6 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
             <h3 className={`text-sm font-bold flex items-center gap-2 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'
@@ -372,13 +524,23 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
 
             <Select
               className="w-full"
-              placeholder="Search and select a unit..."
+              placeholder={!selectedOwner || !start_date || !end_date
+                ? "Please select Fleet Owner and Date Range first"
+                : "Search and select a unit..."}
               showSearch
+              value={selectedUnitValue}
               options={Options}
-              onChange={addTruck}
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
+              disabled={!selectedOwner || !start_date || !end_date}
+              onChange={(value) => {
+                setSelectedUnitValue(value);
+                addTruck(value);
+              }}
+              filterOption={(input, option) => {
+                const searchText = input.toLowerCase();
+                const unitNumber = (option?.unitNumber || '').toLowerCase();
+                const driverName = (option?.driverName || '').toLowerCase();
+                return unitNumber.includes(searchText) || driverName.includes(searchText);
+              }}
             />
           </section>
         </div>

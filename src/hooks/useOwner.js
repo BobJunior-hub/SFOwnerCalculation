@@ -10,6 +10,7 @@ export const useOwner = () => {
   const [loadingDrivers, setLoadingDrivers] = useState({});
   const [selectedOwner, setSelectedOwner] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedUnitValue, setSelectedUnitValue] = useState(null);
   const { data: trucks, isLoading, isError } = useGetTrucks();
   const [start_date, setStart_date] = useState();
   const [end_date, setEnd_date] = useState(null);
@@ -156,10 +157,138 @@ export const useOwner = () => {
     }
   };
 
+  const fetchMultipleDriversData = async (item, drivers) => {
+    if (!drivers || drivers.length === 0 || !start_date || !end_date) {
+      setTrucksData((prev) =>
+        prev.map((current) =>
+          current.truckId === item.truckId
+            ? { ...current, status: "manual" }
+            : current
+        )
+      );
+      return;
+    }
+
+    setLoadingDrivers((prev) => ({ ...prev, [item.truckId]: true }));
+
+    try {
+      const driverPromises = drivers.map(async (driver) => {
+        try {
+          const params = new URLSearchParams({
+            driver: String(driver.id),
+            start_date: start_date,
+            end_date: end_date,
+          });
+
+          const result = await apiRequest(
+            `/calculations/statement-by-driver/?${params.toString()}`
+          );
+
+          let driverData = null;
+          if (result && Array.isArray(result) && result.length > 0) {
+            driverData = result[0];
+          } else if (
+            result &&
+            typeof result === "object" &&
+            !Array.isArray(result)
+          ) {
+            driverData = result;
+          }
+
+          if (driverData) {
+            const {
+              driverName,
+              companyName,
+              totalAmount,
+              totalGross,
+              note,
+              pdf,
+              statementId,
+            } = extractDriverInfo(driverData);
+
+            return {
+              id: driver.id,
+              full_name: driver.full_name,
+              amount: totalAmount,
+              statementId: statementId,
+              driverName: driverName,
+              company: companyName,
+              note: note,
+              pdf: pdf,
+            };
+          }
+          return {
+            id: driver.id,
+            full_name: driver.full_name,
+            amount: 0,
+            statementId: null,
+            driverName: "",
+            company: "",
+            note: "",
+            pdf: null,
+          };
+        } catch (error) {
+          return {
+            id: driver.id,
+            full_name: driver.full_name,
+            amount: 0,
+            statementId: null,
+            driverName: "",
+            company: "",
+            note: "",
+            pdf: null,
+          };
+        }
+      });
+
+      const driverResults = await Promise.all(driverPromises);
+      const totalAmount = driverResults.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+      const allCompanies = driverResults.map((d) => d.company).filter((c) => c).join(", ");
+      const allNotes = driverResults.map((d) => d.note).filter((n) => n).join("; ");
+      const firstPdf = driverResults.find((d) => d.pdf)?.pdf || null;
+
+      setTrucksData((prev) =>
+        prev.map((current) =>
+          current.truckId === item.truckId
+            ? {
+                ...current,
+                status: "fetched",
+                drivers: driverResults.map((d) => ({
+                  id: d.id,
+                  full_name: d.full_name,
+                  amount: String(d.amount),
+                  statementId: d.statementId,
+                })),
+                totalAmount: String(totalAmount),
+                company: allCompanies,
+                note: allNotes,
+                pdf: firstPdf,
+              }
+            : current
+        )
+      );
+    } catch (error) {
+      setTrucksData((prev) =>
+        prev.map((current) =>
+          current.truckId === item.truckId
+            ? { ...current, status: "manual" }
+            : current
+        )
+      );
+    } finally {
+      setLoadingDrivers((prev) => {
+        const newState = { ...prev };
+        delete newState[item.truckId];
+        return newState;
+      });
+    }
+  };
+
   const addTruck = async (truckIdStr) => {
     if (!truckIdStr) return;
 
     if (!start_date || !end_date) {
+      setSelectedUnitValue(null);
       return;
     }
 
@@ -169,9 +298,13 @@ export const useOwner = () => {
       return String(tId) === String(truckId);
     });
 
-    if (!truck) return;
+    if (!truck) {
+      setSelectedUnitValue(null);
+      return;
+    }
 
     if (selectedTruckIds.has(truck.id || truck._id)) {
+      setSelectedUnitValue(null);
       return;
     }
 
@@ -183,31 +316,46 @@ export const useOwner = () => {
     const unitNumber = truck.unit_number || "N/A";
     const vin = truck.VIN || truck.vin || "N/A";
 
-    let driverId = null;
+    let drivers = [];
     if (
       truck.driver &&
       Array.isArray(truck.driver) &&
       truck.driver.length > 0
     ) {
-      driverId = truck.driver[0].id;
+      drivers = truck.driver.map((d) => ({
+        id: d.id,
+        full_name: d.full_name || "",
+      }));
     } else if (
       truck.driver &&
       typeof truck.driver === "object" &&
       truck.driver.id
     ) {
-      driverId = truck.driver.id;
+      drivers = [{
+        id: truck.driver.id,
+        full_name: truck.driver.full_name || "",
+      }];
     } else if (truck.driver && typeof truck.driver === "number") {
-      driverId = truck.driver;
+      drivers = [{ id: truck.driver, full_name: "" }];
     } else if (truck.driver_id) {
-      driverId = truck.driver_id;
+      drivers = [{ id: truck.driver_id, full_name: "" }];
     }
+
+    const driverNames = drivers.map((d) => d.full_name).filter((name) => name).join(" / ");
+    const driverId = drivers.length > 0 ? drivers[0].id : null;
 
     const newItem = {
       truckId: truckIdValue,
       unitNumber: unitNumber,
       vin: vin,
       driverId: driverId,
-      driverName: "",
+      driverName: driverNames,
+      drivers: drivers.map((d) => ({
+        id: d.id,
+        full_name: d.full_name,
+        amount: "",
+        statementId: null,
+      })),
       totalAmount: "",
       totalGross: "",
       escrow: "",
@@ -220,8 +368,8 @@ export const useOwner = () => {
 
     setTrucksData((prev) => [...prev, newItem]);
 
-    if (driverId) {
-      await fetchDriverData(newItem, driverId);
+    if (drivers.length > 0) {
+      await fetchMultipleDriversData(newItem, drivers);
     } else {
       setTrucksData((prev) =>
         prev.map((item) =>
@@ -231,6 +379,9 @@ export const useOwner = () => {
         )
       );
     }
+
+    // Clear the selected unit value after adding
+    setSelectedUnitValue(null);
   };
 
   const removeTruck = (truckId) => {
@@ -478,6 +629,7 @@ export const useOwner = () => {
     setSelectedTruckIds(new Set());
     setTrucksData([]);
     setLoadingDrivers({});
+    setSelectedUnitValue(null);
   };
 
   const Options = [];
@@ -485,11 +637,21 @@ export const useOwner = () => {
     trucks.forEach((truck) => {
       const truckId = truck.id || truck._id;
       if (!selectedTruckIds.has(truckId)) {
-      Options.push({
-          label: `${truck.unit_number || "N/A"}-${
-            truck.VIN || truck.vin || "N/A"
-          }`,
+        const unitNumber = truck.unit_number || "N/A";
+        let driverNames = [];
+        if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
+          driverNames = truck.driver
+            .map((d) => d.full_name)
+            .filter((name) => name && name.trim());
+        } else if (truck.driver && typeof truck.driver === "object" && truck.driver.full_name) {
+          driverNames = [truck.driver.full_name];
+        }
+        const driverName = driverNames.join(" / ");
+        Options.push({
+          label: `Unit ${unitNumber}${driverName ? ` - ${driverName}` : " - No Driver"}`,
           value: String(truckId),
+          unitNumber: unitNumber,
+          driverName: driverName,
         });
       }
     });
@@ -517,5 +679,7 @@ export const useOwner = () => {
     setEnd_date: handleSetEndDate,
     startDateForPicker,
     endDateForPicker,
+    selectedUnitValue,
+    setSelectedUnitValue,
   };
 };

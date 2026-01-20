@@ -174,6 +174,23 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       return;
     }
 
+    // Auto-populate driver name from selected truck (supports team drivers).
+    let driverNameFromTruck = '';
+    if (Array.isArray(truck.driver) && truck.driver.length > 0) {
+      driverNameFromTruck = truck.driver
+        .map((d) => d?.full_name || d?.fullName || d?.name)
+        .filter(Boolean)
+        .join(' / ');
+    } else if (truck.driver && typeof truck.driver === 'object') {
+      driverNameFromTruck = truck.driver.full_name || truck.driver.fullName || truck.driver.name || '';
+    } else if (typeof truck.driver === 'string') {
+      driverNameFromTruck = truck.driver;
+    }
+
+    if (driverNameFromTruck) {
+      form.setFieldsValue({ driver: driverNameFromTruck });
+    }
+
     let driverId = null;
     if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
       driverId = truck.driver[0].id;
@@ -189,7 +206,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       await fetchDriverStatement(driverId);
     } else {
       setDriverData(null);
-      form.setFieldsValue({ driver: '', amount: undefined, escrow: undefined });
+      form.setFieldsValue({ driver: driverNameFromTruck || '', amount: undefined, escrow: undefined });
     }
   };
 
@@ -325,12 +342,29 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
   const truckOptions = trucks?.map((truck) => {
     const truckId = truck.id || truck._id;
     const unitNumber = truck.unit_number || 'N/A';
-    const vin = truck.VIN || truck.vin || 'N/A';
-    const label = `${unitNumber} (VIN: ${vin})`;
+
+    // Driver may come as array or direct fields; prefer full_name.
+    // If multiple drivers (team), join with " / ".
+    const driverFromArray = Array.isArray(truck.driver) && truck.driver.length
+      ? truck.driver
+        .map((d) => d?.full_name || d?.fullName || d?.name)
+        .filter(Boolean)
+        .join(' / ')
+      : null;
+
+    const driverName =
+      driverFromArray ||
+      truck.driver_full_name ||
+      truck.driverFullName ||
+      truck.driver_name ||
+      truck.driverName ||
+      'Unknown Driver';
+
+    const label = `${unitNumber} - ${driverName}`;
 
     return {
       value: truckId,
-      label: label,
+      label,
     };
   });
 
@@ -418,7 +452,6 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         >
           <Input
             placeholder="Enter driver name (optional)"
-            disabled={!!driverData?.driverName}
           />
         </Form.Item>
 
