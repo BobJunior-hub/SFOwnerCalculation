@@ -4,66 +4,71 @@ import { App, Button, Drawer, Form, Input, InputNumber, Select, Spin } from 'ant
 import React, { useEffect, useState } from 'react';
 import { apiRequest, getAuthToken } from './api';
 import { useTheme } from './menu';
-import { useGetTrucks } from './services/query/useGetTrucks';
 const { TextArea } = Input;
 
 
-const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
+const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [loadingDriver, setLoadingDriver] = useState(false);
   const [driverData, setDriverData] = useState(null);
-  const [allTrucks, setAllTrucks] = useState([]);
   const [loadingTrucks, setLoadingTrucks] = useState(false);
+  const [allTrucks, setAllTrucks] = useState([]);
   const currentTheme = useTheme();
   const queryClient = useQueryClient();
-  const { data: trucks, isLoading, isError } = useGetTrucks();
 
+  const fetchAllTrucks = async () => {
+    if (!getAuthToken()) {
+      return;
+    }
 
-  useEffect(() => {
-    const fetchAllTrucks = async () => {
-      if (!open || !getAuthToken()) {
-        return;
-      }
-      try {
-        setLoadingTrucks(true);
-        const result = await apiRequest('/calculations/all-trucks');
+    setLoadingTrucks(true);
+    try {
+      const result = await apiRequest('/calculations/all-trucks');
 
-
-        let trucksList = [];
-        if (Array.isArray(result)) {
-          trucksList = result;
-        } else if (result && typeof result === 'object') {
-          trucksList = result.trucks || result.data || result.results || result.items || [];
-          if (!Array.isArray(trucksList) && typeof trucksList === 'object') {
-            trucksList = Object.values(trucksList);
-          }
+      let trucksList = [];
+      if (Array.isArray(result)) {
+        trucksList = result;
+      } else if (result && typeof result === 'object') {
+        trucksList = result.trucks || result.data || result.results || result.items || [];
+        if (!Array.isArray(trucksList) && typeof trucksList === 'object') {
+          trucksList = Object.values(trucksList);
         }
-
-        setAllTrucks(Array.isArray(trucksList) ? trucksList : []);
-      } catch (err) {
-        console.error('Error fetching trucks:', err);
-        setAllTrucks([]);
-      } finally {
-        setLoadingTrucks(false);
       }
-    };
-    fetchAllTrucks();
-  }, [open]);
+
+      setAllTrucks(Array.isArray(trucksList) ? trucksList : []);
+    } catch (err) {
+      message.error('Failed to load trucks. Please try again.');
+      setAllTrucks([]);
+    } finally {
+      setLoadingTrucks(false);
+    }
+  };
 
   useEffect(() => {
     if (open && calculation) {
-      form.resetFields();
-      setDriverData(null);
-
-      const ownerId = calculation.id || null;
-
-      if (ownerId) {
-        form.setFieldsValue({ owner: ownerId });
+      fetchAllTrucks();
+      if (deduction) {
+        const truckId = typeof deduction.truck === 'object' ? (deduction.truck?.id || deduction.truck?._id) : deduction.truck;
+        form.setFieldsValue({
+          owner: typeof deduction.owner === 'object' ? (deduction.owner?.id || deduction.owner?._id) : (deduction.owner || calculation.id || null),
+          truck: truckId ? String(truckId) : null,
+          driver: deduction.driver || '',
+          amount: deduction.amount || null,
+          escrow: deduction.escrow || null,
+          note: deduction.note || '',
+        });
+      } else {
+        form.resetFields();
+        setDriverData(null);
+        const ownerId = calculation.id || null;
+        if (ownerId) {
+          form.setFieldsValue({ owner: ownerId });
+        }
       }
     }
-  }, [open, calculation, form]);
+  }, [open, calculation, deduction, form]);
 
   const fetchDriverStatement = async (driverId) => {
     if (!driverId || !calculation) {
@@ -158,57 +163,6 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
     }
   };
 
-  const handleTruckChange = async (truckId) => {
-    if (!truckId) {
-      setDriverData(null);
-      form.setFieldsValue({ driver: '', amount: undefined, escrow: undefined });
-      return;
-    }
-
-    const truck = allTrucks.find(t => {
-      const tId = t.id || t._id;
-      return String(tId) === String(truckId);
-    });
-
-    if (!truck) {
-      return;
-    }
-
-    // Auto-populate driver name from selected truck (supports team drivers).
-    let driverNameFromTruck = '';
-    if (Array.isArray(truck.driver) && truck.driver.length > 0) {
-      driverNameFromTruck = truck.driver
-        .map((d) => d?.full_name || d?.fullName || d?.name)
-        .filter(Boolean)
-        .join(' / ');
-    } else if (truck.driver && typeof truck.driver === 'object') {
-      driverNameFromTruck = truck.driver.full_name || truck.driver.fullName || truck.driver.name || '';
-    } else if (typeof truck.driver === 'string') {
-      driverNameFromTruck = truck.driver;
-    }
-
-    if (driverNameFromTruck) {
-      form.setFieldsValue({ driver: driverNameFromTruck });
-    }
-
-    let driverId = null;
-    if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
-      driverId = truck.driver[0].id;
-    } else if (truck.driver && typeof truck.driver === 'object' && truck.driver.id) {
-      driverId = truck.driver.id;
-    } else if (truck.driver && typeof truck.driver === 'number') {
-      driverId = truck.driver;
-    } else if (truck.driver_id) {
-      driverId = truck.driver_id;
-    }
-
-    if (driverId) {
-      await fetchDriverStatement(driverId);
-    } else {
-      setDriverData(null);
-      form.setFieldsValue({ driver: driverNameFromTruck || '', amount: undefined, escrow: undefined });
-    }
-  };
 
   const handleSubmit = async (values) => {
     if (!calculation) {
@@ -230,19 +184,6 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
 
     setLoading(true);
     try {
-      let truck = null;
-      if (values.truck) {
-        truck = allTrucks.find(t => {
-          const tId = t.id || t._id;
-          return String(tId) === String(values.truck);
-        });
-
-        if (!truck) {
-          message.error('Truck not found');
-          setLoading(false);
-          return;
-        }
-      }
 
       let amountValue = 0;
       if (values.amount !== null && values.amount !== undefined && values.amount !== '') {
@@ -304,26 +245,48 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         calculationUnitPayload.note = values.note.trim();
       }
 
-      console.log('=== Creating Deduction for Specific Week ===');
-      console.log('Week Period:', calculation.start_date, 'to', calculation.end_date);
-      console.log('Owner ID:', ownerId);
-      console.log('Owner Name:', calculation.owner);
-      console.log('Sending POST request to /calculations/calculation-unit/ with payload:', calculationUnitPayload);
+      if (deduction && deduction.id) {
+        console.log('=== Updating Deduction ===');
+        console.log('Deduction ID:', deduction.id);
+        console.log('Sending PUT request to /calculations/calculation-unit/' + deduction.id + '/ with payload:', calculationUnitPayload);
 
-      const createdDeduction = await apiRequest('/calculations/calculation-unit/', {
-        method: 'POST',
-        body: JSON.stringify(calculationUnitPayload),
-      });
+        const updatedDeduction = await apiRequest(`/calculations/calculation-unit/${deduction.id}/`, {
+          method: 'PUT',
+          body: JSON.stringify(calculationUnitPayload),
+        });
 
-      console.log('Calculation unit created successfully');
-
-      message.success('Deduction created successfully for the selected owner and period!');
-      form.resetFields();
-      setDriverData(null);
-      onClose();
-      if (onSuccess) {
-        onSuccess(createdDeduction);
+        console.log('Deduction updated successfully');
+        message.success('Deduction updated successfully!');
         queryClient.invalidateQueries({ queryKey: ['owner'] });
+        queryClient.invalidateQueries({ queryKey: ['owner-calculation'] });
+        form.resetFields();
+        setDriverData(null);
+        onClose();
+        if (onSuccess) {
+          onSuccess(updatedDeduction);
+        }
+      } else {
+        console.log('=== Creating Deduction for Specific Week ===');
+        console.log('Week Period:', calculation.start_date, 'to', calculation.end_date);
+        console.log('Owner ID:', ownerId);
+        console.log('Owner Name:', calculation.owner);
+        console.log('Sending POST request to /calculations/calculation-unit/ with payload:', calculationUnitPayload);
+
+        const createdDeduction = await apiRequest('/calculations/calculation-unit/', {
+          method: 'POST',
+          body: JSON.stringify(calculationUnitPayload),
+        });
+
+        console.log('Calculation unit created successfully');
+        message.success('Deduction created successfully for the selected owner and period!');
+        queryClient.invalidateQueries({ queryKey: ['owner'] });
+        queryClient.invalidateQueries({ queryKey: ['owner-calculation'] });
+        form.resetFields();
+        setDriverData(null);
+        onClose();
+        if (onSuccess) {
+          onSuccess(createdDeduction);
+        }
       }
     } catch (error) {
       console.error('Error creating deduction:', error);
@@ -339,34 +302,6 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
     onClose();
   };
 
-  const truckOptions = trucks?.map((truck) => {
-    const truckId = truck.id || truck._id;
-    const unitNumber = truck.unit_number || 'N/A';
-
-    // Driver may come as array or direct fields; prefer full_name.
-    // If multiple drivers (team), join with " / ".
-    const driverFromArray = Array.isArray(truck.driver) && truck.driver.length
-      ? truck.driver
-        .map((d) => d?.full_name || d?.fullName || d?.name)
-        .filter(Boolean)
-        .join(' / ')
-      : null;
-
-    const driverName =
-      driverFromArray ||
-      truck.driver_full_name ||
-      truck.driverFullName ||
-      truck.driver_name ||
-      truck.driverName ||
-      'Unknown Driver';
-
-    const label = `${unitNumber} - ${driverName}`;
-
-    return {
-      value: truckId,
-      label,
-    };
-  });
 
   if (!calculation) return null;
 
@@ -381,7 +316,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       title={
         <div>
           <h2 className={`text-xl font-bold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-            Add Deduction
+            {deduction ? 'Edit Deduction' : 'Add Deduction'}
           </h2>
           <div className={`text-sm space-y-1 ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
             <p>Owner: {calculation.owner || 'N/A'} (ID: {ownerId || 'N/A'})</p>
@@ -393,6 +328,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       onClose={handleClose}
       open={open}
       width={600}
+      duration={0.10}
       className={currentTheme === 'dark' ? 'bg-white/5' : 'bg-white'}
       styles={{
         body: {
@@ -426,18 +362,75 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
 
         <Form.Item
           name="truck"
-          label={<span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Truck ID</span>}
+          label={<span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Truck Unit</span>}
         >
           <Select
-            loading={isLoading}
-            placeholder="Select Truck (optional)"
-            showSearch
+            placeholder="Select truck unit (optional)"
+            style={{ width: '100%' }}
             allowClear
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            loading={loadingTrucks}
+            showSearch
+            onChange={(value) => {
+              if (value) {
+                const selectedTruck = allTrucks.find(truck => {
+                  const truckId = truck.id || truck._id;
+                  return String(truckId) === String(value);
+                });
+
+                if (selectedTruck) {
+                  let driverNames = [];
+                  if (selectedTruck.driver && Array.isArray(selectedTruck.driver) && selectedTruck.driver.length > 0) {
+                    driverNames = selectedTruck.driver
+                      .map((d) => d.full_name)
+                      .filter((name) => name && name.trim());
+                  } else if (selectedTruck.driver && typeof selectedTruck.driver === 'object' && selectedTruck.driver.full_name) {
+                    driverNames = [selectedTruck.driver.full_name];
+                  }
+                  const driverName = driverNames.join(' / ');
+
+                  form.setFieldsValue({ driver: driverName || '' });
+                }
+              } else {
+                form.setFieldsValue({ driver: '' });
+              }
+            }}
+            filterOption={(input, option) => {
+              const searchText = input.toLowerCase();
+              const unitNumber = (option?.unitNumber || '').toLowerCase();
+              const driverName = (option?.driverName || '').toLowerCase();
+              return unitNumber.includes(searchText) || driverName.includes(searchText);
+            }}
+            options={allTrucks.map(truck => {
+              const truckId = truck.id || truck._id;
+              const unitNumber = truck.unit_number || 'N/A';
+              let driverNames = [];
+              if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
+                driverNames = truck.driver
+                  .map((d) => d.full_name)
+                  .filter((name) => name && name.trim());
+              } else if (truck.driver && typeof truck.driver === 'object' && truck.driver.full_name) {
+                driverNames = [truck.driver.full_name];
+              }
+              const driverName = driverNames.join(' / ');
+              return {
+                value: String(truckId),
+                label: `Unit ${unitNumber}${driverName ? ` - ${driverName}` : ' - No Driver'}`,
+                unitNumber: unitNumber,
+                driverName: driverName,
+              };
+            })}
+            notFoundContent={
+              loadingTrucks ? (
+                <div className="text-center py-2">
+                  <Spin size="small" /> <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Loading trucks...</span>
+                </div>
+              ) : (
+                <div className={`text-center py-2 ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                  No trucks found
+                </div>
+              )
             }
-            onChange={handleTruckChange}
-            options={truckOptions}/>
+          />
         </Form.Item>
 
         {loadingDriver && (
@@ -456,50 +449,96 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         </Form.Item>
 
         <Form.Item
-          name="amount"
           label={<span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Amount</span>}
-          rules={[{ required: true, message: 'Please enter amount' }]}
+          shouldUpdate={(prevValues, currentValues) => prevValues.amount !== currentValues.amount}
         >
-          <InputNumber
-            placeholder="Enter amount (can be positive or negative)"
-            style={{ width: '100%' }}
-            step={0.01}
-            formatter={(value) => {
-              if (!value && value !== 0) return '';
-              const num = parseFloat(value);
-              if (isNaN(num)) return '';
-              const sign = num < 0 ? '-' : '';
-              const absValue = Math.abs(num);
-              return `${sign}$ ${absValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            }}
-            parser={(value) => {
-              if (!value) return '';
-              return value.replace(/\$\s?|(,*)/g, '');
-            }}
-          />
+          {({ getFieldValue }) => {
+            const amountValue = getFieldValue('amount');
+            const amt = parseFloat(amountValue) || 0;
+            let color = currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+            if (amt < 0) color = currentTheme === 'dark' ? '#f87171' : '#dc2626';
+            if (amt > 0) color = currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+
+            return (
+              <Form.Item name="amount" noStyle>
+                <InputNumber
+                  placeholder="Enter amount (can be positive or negative)"
+                  step={0.01}
+                  controls={true}
+                  keyboard={true}
+                  formatter={(value) => {
+                    if (!value && value !== 0) return '';
+                    const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                    if (isNaN(numValue)) return '';
+                    return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                  }}
+                  parser={(value) => {
+                    if (!value) return '';
+                    const cleaned = value.replace(/[^0-9.-]/g, '');
+                    const num = parseFloat(cleaned);
+                    return isNaN(num) ? '' : cleaned;
+                  }}
+                  onKeyPress={(e) => {
+                    const char = String.fromCharCode(e.which || e.keyCode);
+                    if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  style={{
+                    color: color,
+                    width: '100%'
+                  }}
+                />
+              </Form.Item>
+            );
+          }}
         </Form.Item>
 
+
         <Form.Item
-          name="escrow"
           label={<span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Escrow</span>}
+          shouldUpdate={(prevValues, currentValues) => prevValues.escrow !== currentValues.escrow}
         >
-          <InputNumber
-            placeholder="Enter escrow (can be positive or negative)"
-            style={{ width: '100%' }}
-            step={0.01}
-            formatter={(value) => {
-              if (!value && value !== 0) return '';
-              const num = parseFloat(value);
-              if (isNaN(num)) return '';
-              const sign = num < 0 ? '-' : '';
-              const absValue = Math.abs(num);
-              return `${sign}$ ${absValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            }}
-            parser={(value) => {
-              if (!value) return '';
-              return value.replace(/\$\s?|(,*)/g, '');
-            }}
-          />
+          {({ getFieldValue }) => {
+            const escrowValue = getFieldValue('escrow');
+            const amt = parseFloat(escrowValue) || 0;
+            let color = currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+            if (amt < 0) color = currentTheme === 'dark' ? '#f87171' : '#dc2626';
+            if (amt > 0) color = currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+
+            return (
+              <Form.Item name="escrow" noStyle>
+                <InputNumber
+                  placeholder="Enter escrow (can be positive or negative)"
+                  step={0.01}
+                  controls={true}
+                  keyboard={true}
+                  formatter={(value) => {
+                    if (!value && value !== 0) return '';
+                    const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                    if (isNaN(numValue)) return '';
+                    return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                  }}
+                  parser={(value) => {
+                    if (!value) return '';
+                    const cleaned = value.replace(/[^0-9.-]/g, '');
+                    const num = parseFloat(cleaned);
+                    return isNaN(num) ? '' : cleaned;
+                  }}
+                  onKeyPress={(e) => {
+                    const char = String.fromCharCode(e.which || e.keyCode);
+                    if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  style={{
+                    color: color,
+                    width: '100%'
+                  }}
+                />
+              </Form.Item>
+            );
+          }}
         </Form.Item>
 
         <Form.Item
@@ -524,9 +563,8 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
               htmlType="submit"
               loading={loading}
               className="bg-[#E77843] hover:bg-[#F59A6B] border-[#E77843] hover:border-[#F59A6B]"
-              icon={<SaveOutlined />}
-            >
-              Save Deduction
+              icon={<SaveOutlined />}>
+              {deduction ? 'Update Deduction' : 'Save Deduction'}
             </Button>
           </div>
         </Form.Item>

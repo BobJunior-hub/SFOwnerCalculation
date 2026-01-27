@@ -1,10 +1,10 @@
-import { DollarOutlined, TruckOutlined, WalletOutlined, ClearOutlined, BarChartOutlined } from '@ant-design/icons';
+import { BarChartOutlined, ClearOutlined, DollarOutlined, TruckOutlined, WalletOutlined } from '@ant-design/icons';
 import { Button, Card, Empty, Select, Spin, Statistic, Tag } from 'antd';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useState } from 'react';
-import { apiRequest, getAuthToken } from '../api';
-import { useTheme } from '../menu';
+import { apiRequest } from '../api';
 import { owners } from '../components/OwerComponent/helpers/owners';
+import { useTheme } from '../menu';
 
 const Analytics = () => {
   const [selectedOwner, setSelectedOwner] = useState(null);
@@ -15,7 +15,7 @@ const Analytics = () => {
 
   const getCurrentUser = () => {
     try {
-      const userStr =  sessionStorage.getItem('user');
+      const userStr = sessionStorage.getItem('user');
       if (userStr) {
         return JSON.parse(userStr);
       }
@@ -55,13 +55,51 @@ const Analytics = () => {
     return null;
   };
 
-  useEffect(() => {
-    if (currentUser?.department?.toLowerCase() === 'owner' && currentUser?.username) {
-      setSelectedOwner(currentUser.username);
-    } else if (currentUser && currentUser?.department?.toLowerCase() !== 'owner') {
-      setSelectedOwner('Yulduz');
+  const getSharedOwner = () => {
+    try {
+      const stored = localStorage.getItem('selectedOwner');
+      if (stored) {
+        return stored;
+      }
+    } catch (e) {
+      console.error('Error loading selected owner from localStorage:', e);
     }
-  }, [currentUser]);
+    return null;
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      const sharedOwner = getSharedOwner();
+      if (currentUser?.department?.toLowerCase() === 'owner' && currentUser?.username) {
+        const ownerUsername = currentUser.username;
+        if (!sharedOwner || sharedOwner !== ownerUsername) {
+          setSelectedOwner(ownerUsername);
+          localStorage.setItem('selectedOwner', ownerUsername);
+        } else if (sharedOwner === ownerUsername) {
+          setSelectedOwner(sharedOwner);
+        }
+      } else if (!isOwnerDepartment) {
+        if (sharedOwner) {
+          setSelectedOwner(sharedOwner);
+        }
+      }
+    }
+  }, [currentUser, isOwnerDepartment]);
+
+  useEffect(() => {
+    const handleOwnerChange = () => {
+      const sharedOwner = getSharedOwner();
+      if (sharedOwner && !isOwnerDepartment) {
+        setSelectedOwner(sharedOwner);
+      }
+    };
+
+    window.addEventListener('ownerChanged', handleOwnerChange);
+
+    return () => {
+      window.removeEventListener('ownerChanged', handleOwnerChange);
+    };
+  }, [isOwnerDepartment]);
 
   const fetchAnalytics = useCallback(async () => {
     if (!selectedOwner) return;
@@ -98,24 +136,24 @@ const Analytics = () => {
   }, [selectedOwner, fetchAnalytics]);
 
   useEffect(() => {
-    const handleStorageChange = () => {
+    const handleDateRangeChange = () => {
       if (selectedOwner) {
         fetchAnalytics();
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('dateRangeChanged', handleStorageChange);
+    window.addEventListener('dateRangeChanged', handleDateRangeChange);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('dateRangeChanged', handleStorageChange);
+      window.removeEventListener('dateRangeChanged', handleDateRangeChange);
     };
   }, [selectedOwner, fetchAnalytics]);
 
   const handleClearFilter = () => {
     setSelectedOwner(null);
     setAnalyticsData(null);
+    localStorage.removeItem('selectedOwner');
+    window.dispatchEvent(new Event('ownerChanged'));
   };
 
   const getFieldValue = (obj, fieldNames) => {
@@ -168,7 +206,15 @@ const Analytics = () => {
                 <Select
                   placeholder="Select Owner"
                   value={selectedOwner}
-                  onChange={setSelectedOwner}
+                  onChange={(value) => {
+                    setSelectedOwner(value);
+                    if (value) {
+                      localStorage.setItem('selectedOwner', value);
+                      window.dispatchEvent(new Event('ownerChanged'));
+                    } else {
+                      localStorage.removeItem('selectedOwner');
+                    }
+                  }}
                   style={{ width: '200px' }}
                   showSearch
                   filterOption={(input, option) =>

@@ -25,11 +25,14 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
   useEffect(() => {
     if (open) {
       fetchAllTrucks();
-    setSelectedOwner('');
-    setDateRange(null);
-    setSelectedTruckIds(new Set());
-    setTrucksData([]);
-    setLoadingDrivers({});
+      const storedOwner = localStorage.getItem('selectedOwner');
+      if (storedOwner) {
+        setSelectedOwner(storedOwner);
+      }
+      setDateRange(null);
+      setSelectedTruckIds(new Set());
+      setTrucksData([]);
+      setLoadingDrivers({});
     }
   }, [open]);
 
@@ -204,15 +207,15 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
         setTrucksData(prev => prev.map(current =>
           current.truckId === item.truckId
             ? {
-                ...current,
-                status: 'fetched',
-                driverName,
-                company: companyName,
-                amount: String(amount),
-                escrow: current.escrow || '',
-                note,
-                statementId,
-              }
+              ...current,
+              status: 'fetched',
+              driverName,
+              company: companyName,
+              amount: String(amount),
+              escrow: current.escrow || '',
+              note,
+              statementId,
+            }
             : current
         ));
 
@@ -446,7 +449,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
         setTrucksData([]);
       } else {
         const postPayload = {
-        owner: selectedOwner,
+          owner: selectedOwner,
           start_date: startDateStr,
           end_date: endDateStr,
           units: payloadUnits,
@@ -454,7 +457,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
 
         try {
           response = await apiRequest('/calculations/owner-calculation/', {
-        method: 'POST',
+            method: 'POST',
             body: JSON.stringify(postPayload),
           });
 
@@ -464,8 +467,8 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
 
         } catch (postError) {
           const isAlreadyExistsError = postError?.message?.includes('already exists') ||
-                                     postError?.response?.error?.includes('already exists') ||
-                                     postError?.response?.detail?.includes('already exists');
+            postError?.response?.error?.includes('already exists') ||
+            postError?.response?.detail?.includes('already exists');
 
           if (isAlreadyExistsError) {
             const fetchedCalculation = await fetchExistingCalculation(selectedOwner, startDateStr, endDateStr);
@@ -512,7 +515,6 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
         }
       }
 
-      setSelectedOwner('');
       setDateRange(null);
       setSelectedTruckIds(new Set());
       setTrucksData([]);
@@ -536,7 +538,6 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
   };
 
   const handleClose = () => {
-    setSelectedOwner('');
     setDateRange(null);
     setSelectedTruckIds(new Set());
     setTrucksData([]);
@@ -565,6 +566,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
       onClose={handleClose}
       open={open}
       width={900}
+      duration={0.10}
       className={currentTheme === 'dark' ? 'bg-white/5' : 'bg-white'}
       styles={{
         body: {
@@ -580,74 +582,72 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
       <div className={`flex flex-col h-full ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           <section className="space-y-4">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                    currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-orange-100 text-orange-600'
-                  }`}>
-                    1
-                  </span>
-                  <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-orange-600'}>Configuration</span>
-                </div>
-
-                <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-xl border ${
-                  currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10 shadow-sm'
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-orange-100 text-orange-600'
                 }`}>
-                  <div className="md:col-span-2">
-                    <label className={`block text-sm font-semibold mb-1.5 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
-                      Fleet Owner
-                    </label>
-            <Select
-              className="w-full"
-              placeholder="Choose owner..."
-              value={selectedOwner}
-                      onChange={(value) => {
-                        setSelectedOwner(value);
-                        setSelectedTruckIds(new Set());
-                        setTrucksData([]);
-                      }}
-              showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      options={owners.map((owner) => ({
-                        value: typeof owner === 'string' ? owner : owner.name || owner.owner,
-                        label: typeof owner === 'string' ? owner : owner.name || owner.owner,
-                      }))}
-                    />
-                  </div>
+                1
+              </span>
+              <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-orange-600'}>Configuration </span>
+            </div>
 
-              <div>
-                    <label className={`block text-sm font-semibold mb-1.5 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
-                      Period Start
-                    </label>
-                <DatePicker
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-xl border ${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10 shadow-sm'
+              }`}>
+              <div className="md:col-span-2">
+                <label className={`block text-sm font-semibold mb-1.5 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
+                  Fleet Owner
+                </label>
+                <Select
                   className="w-full"
-                      format="YYYY-MM-DD"
-                      value={dateRange ? dateRange[0] : null}
-                      onChange={(date) => {
-                        if (date) {
-                          const endDate = date.clone().add(6, 'day');
-                          setDateRange([date, endDate]);
-                        } else {
-                          setDateRange(null);
-                        }
-                      }}
+                  placeholder="Choose owner..."
+                  value={selectedOwner}
+                  onChange={(value) => {
+                    setSelectedOwner(value);
+                    setSelectedTruckIds(new Set());
+                    setTrucksData([]);
+                  }}
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={owners.map((owner) => ({
+                    value: typeof owner === 'string' ? owner : owner.name || owner.owner,
+                    label: typeof owner === 'string' ? owner : owner.name || owner.owner,
+                  }))}
                 />
               </div>
 
               <div>
-                    <label className={`block text-sm font-semibold mb-1.5 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
-                      Period End
-                    </label>
+                <label className={`block text-sm font-semibold mb-1.5 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
+                  Period Start
+                </label>
                 <DatePicker
                   className="w-full"
-                      format="YYYY-MM-DD"
-                      value={dateRange ? dateRange[1] : null}
-                      onChange={(date) => {
-                        if (date && dateRange && dateRange[0]) {
-                          setDateRange([dateRange[0], date]);
-                        }
-                      }}
+                  format="YYYY-MM-DD"
+                  value={dateRange ? dateRange[0] : null}
+                  onChange={(date) => {
+                    if (date) {
+                      const endDate = date.clone().add(6, 'day');
+                      setDateRange([date, endDate]);
+                    } else {
+                      setDateRange(null);
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-semibold mb-1.5 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
+                  Period End
+                </label>
+                <DatePicker
+                  className="w-full"
+                  format="YYYY-MM-DD"
+                  value={dateRange ? dateRange[1] : null}
+                  onChange={(date) => {
+                    if (date && dateRange && dateRange[0]) {
+                      setDateRange([dateRange[0], date]);
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -655,257 +655,246 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
 
           <section className="space-y-4">
             <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                      currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-orange-100 text-orange-600'
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-orange-100 text-orange-600'
+                  }`}>
+                  2
+                </span>
+                <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-orange-600'}>Calculation Units</span>
+              </div>
+              <div className={`text-xs font-medium ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                {trucksData.length} Unit(s) selected
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {trucksData.length === 0 ? (
+                <div className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center text-center ${currentTheme === 'dark' ? 'border-white/10 bg-white/5' : 'border-black/10 bg-gray-50'
+                  }`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${currentTheme === 'dark' ? 'bg-white/10 text-white/30' : 'bg-white text-gray-300 shadow-sm'
                     }`}>
-                      2
-                    </span>
-                    <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-orange-600'}>Calculation Units</span>
+                    <PlusOutlined style={{ fontSize: '24px' }} />
                   </div>
-                  <div className={`text-xs font-medium ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                    {trucksData.length} Unit(s) selected
-                  </div>
+                  <p className={`font-medium ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
+                    No units added to this calculation yet.
+                  </p>
+                  <p className={`text-xs mt-1 ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                    Select units below to start calculations.
+                  </p>
                 </div>
-
-                <div className="space-y-4">
-                  {trucksData.length === 0 ? (
-                    <div className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center text-center ${
-                      currentTheme === 'dark' ? 'border-white/10 bg-white/5' : 'border-black/10 bg-gray-50'
-                    }`}>
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
-                        currentTheme === 'dark' ? 'bg-white/10 text-white/30' : 'bg-white text-gray-300 shadow-sm'
-                      }`}>
-                        <PlusOutlined style={{ fontSize: '24px' }} />
-                      </div>
-                      <p className={`font-medium ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
-                        No units added to this calculation yet.
-                      </p>
-                      <p className={`text-xs mt-1 ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                        Select units below to start calculations.
-                      </p>
-                    </div>
-                  ) : (
-                    trucksData.map((data) => (
-                      <div
-                        key={data.truckId}
-                        className={`border rounded-lg p-4 transition-all ${
-                          currentTheme === 'dark'
-                            ? 'border-white/10 bg-white/5'
-                            : 'border-black/10 bg-white shadow-sm'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              <TruckOutlined style={{ fontSize: '16px' }} />
-                            </div>
-                            <div>
-                              <span className={`font-bold text-sm block ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-                                Unit {data.unitNumber}
-                              </span>
-                              <span className={`text-xs block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                                VIN: {data.vin}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {(data.status === 'loading' || loadingDrivers[data.truckId]) && (
-                              <LoadingOutlined style={{ fontSize: '16px', color: '#E77843' }} spin />
-                            )}
-                            <button
-                              onClick={() => removeTruck(data.truckId)}
-                              className={`transition-colors ${
-                                currentTheme === 'dark' ? 'text-white/30 hover:text-red-500' : 'text-gray-300 hover:text-red-500'
-                              }`}
-                            >
-                              <DeleteOutlined style={{ fontSize: '16px' }} />
-                            </button>
-                          </div>
+              ) : (
+                trucksData.map((data) => (
+                  <div
+                    key={data.truckId}
+                    className={`border rounded-lg p-4 transition-all ${currentTheme === 'dark'
+                      ? 'border-white/10 bg-white/5'
+                      : 'border-black/10 bg-white shadow-sm'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentTheme === 'dark' ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                          <TruckOutlined style={{ fontSize: '16px' }} />
                         </div>
+                        <div>
+                          <span className={`font-bold text-sm block ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
+                            Unit {data.unitNumber}
+                          </span>
+                          <span className={`text-xs block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                            VIN: {data.vin}
+                          </span>
+                        </div>
+                      </div>
 
-                        {data.status !== 'loading' && !loadingDrivers[data.truckId] && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                                Driver Name
-                              </label>
-                              <Input
-                                className="w-full"
-                                value={data.driverName}
-                                onChange={(e) => updateTruckData(data.truckId, 'driverName', e.target.value)}
-                                placeholder="Enter driver name"
-                                disabled={data.status === 'fetched' && data.driverName}
-                              />
-                            </div>
-                            <div>
-                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                                Company
-                              </label>
-                              <Input
-                                className="w-full"
-                                value={data.company}
-                                onChange={(e) => updateTruckData(data.truckId, 'company', e.target.value)}
-                                placeholder="Enter company"
-                              />
-                            </div>
-                            <div>
-                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                                Total Amount
-                              </label>
-                              <Input
-                                className="w-full"
-                                value={data.amount}
-                                onChange={(value) => updateTruckData(data.truckId, 'amount', value ? String(value) : '')}
-                                placeholder="Enter amount"
-                                min={0}
-                                step={0.01}
-                                formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                                parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                                style={{
-                                  color: (() => {
-                                    const amt = parseFloat(data.amount) || 0;
-                                    if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
-                                    if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
-                                    return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
-                                  })()
-                                }}
-                                required={true}/>
-                            </div>
-                            <div>
-                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                                Escrow
-                              </label>
-                              <InputNumber
-                                className="w-full"
-                                value={data.escrow}
-                                onChange={(value) => updateTruckData(data.truckId, 'escrow', value !== null && value !== undefined ? String(value) : '')}
-                                placeholder="Enter escrow (can be positive or negative)"
-                                step={0.01}
-                                formatter={(value) => {
-                                  if (!value && value !== 0) return '';
-                                  const num = parseFloat(value);
-                                  if (isNaN(num)) return '';
-                                  const sign = num < 0 ? '-' : '';
-                                  const absValue = Math.abs(num);
-                                  return `${sign}$ ${absValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                                }}
-                                parser={(value) => {
-                                  if (!value) return '';
-                                  return value.replace(/\$\s?|(,*)/g, '');
-                                }}
-                                style={{ color: currentTheme === 'dark' ? '#60a5fa' : '#2563eb' }}
-                              />
-                            </div>
-                            <div className="md:col-span-2">
-                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                                Note
-                              </label>
-                              <TextArea
-                                rows={2}
-                                value={data.note}
-                                onChange={(e) => updateTruckData(data.truckId, 'note', e.target.value)}
-                                placeholder="Enter note"
-                              />
-                            </div>
-                          </div>
+                      <div className="flex items-center gap-2">
+                        {(data.status === 'loading' || loadingDrivers[data.truckId]) && (
+                          <LoadingOutlined style={{ fontSize: '16px', color: '#E77843' }} spin />
                         )}
-                </div>
-              ))
-            )}
-            <div ref={bottomRef} />
-                </div>
+                        <button
+                          onClick={() => removeTruck(data.truckId)}
+                          className={`transition-colors ${currentTheme === 'dark' ? 'text-white/30 hover:text-red-500' : 'text-gray-300 hover:text-red-500'
+                            }`}
+                        >
+                          <DeleteOutlined style={{ fontSize: '16px' }} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {data.status !== 'loading' && !loadingDrivers[data.truckId] && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                            Driver Name
+                          </label>
+                          <Input
+                            className="w-full"
+                            value={data.driverName}
+                            onChange={(e) => updateTruckData(data.truckId, 'driverName', e.target.value)}
+                            placeholder="Enter driver name"
+                            disabled={data.status === 'fetched' && data.driverName}
+                          />
+                        </div>
+                        <div>
+                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                            Company
+                          </label>
+                          <Input
+                            className="w-full"
+                            value={data.company}
+                            onChange={(e) => updateTruckData(data.truckId, 'company', e.target.value)}
+                            placeholder="Enter company"
+                          />
+                        </div>
+                        <div>
+                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                            Total Amount
+                          </label>
+                          <Input
+                            className="w-full"
+                            value={data.amount}
+                            onChange={(value) => updateTruckData(data.truckId, 'amount', value ? String(value) : '')}
+                            placeholder="Enter amount"
+                            min={0}
+                            step={0.01}
+                            formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                            parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                            style={{
+                              color: (() => {
+                                const amt = parseFloat(data.amount) || 0;
+                                if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
+                                if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+                                return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                              })()
+                            }}
+                            required={true} />
+                        </div>
+                        <div>
+                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                            Escrow
+                          </label>
+                          <InputNumber
+                            className="w-full"
+                            value={data.escrow}
+                            onChange={(value) => updateTruckData(data.truckId, 'escrow', value !== null && value !== undefined ? String(value) : '')}
+                            placeholder="Enter escrow (can be positive or negative)"
+                            step={0.01}
+                            formatter={(value) => {
+                              if (!value && value !== 0) return '';
+                              const num = parseFloat(value);
+                              if (isNaN(num)) return '';
+                              const sign = num < 0 ? '-' : '';
+                              const absValue = Math.abs(num);
+                              return `${sign}$ ${absValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                            }}
+                            parser={(value) => {
+                              if (!value) return '';
+                              return value.replace(/\$\s?|(,*)/g, '');
+                            }}
+                            style={{ color: currentTheme === 'dark' ? '#60a5fa' : '#2563eb' }}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                            Note
+                          </label>
+                          <TextArea
+                            rows={2}
+                            value={data.note}
+                            onChange={(e) => updateTruckData(data.truckId, 'note', e.target.value)}
+                            placeholder="Enter note"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              <div ref={bottomRef} />
+            </div>
           </section>
 
-              <section className={`space-y-4 pt-6 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
-                <h3 className={`text-sm font-bold flex items-center gap-2 ${
-                  currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'
-                }`}>
-                  <PlusOutlined style={{ fontSize: '16px', color: '#E77843' }} /> Add Available Fleet Unit
-                </h3>
+          <section className={`space-y-4 pt-6 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
+            <h3 className={`text-sm font-bold flex items-center gap-2 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'
+              }`}>
+              <PlusOutlined style={{ fontSize: '16px', color: '#E77843' }} /> Add Available Fleet Unit
+            </h3>
 
             {selectedOwner ? (
-                  loadingTrucks ? (
-                    <div className={`flex items-center gap-2 p-4 rounded-xl border ${
-                      currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'
-                    }`}>
-                      <Spin size="small" />
-                      <span className={`text-sm ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
-                        Loading trucks...
-                      </span>
-                    </div>
-                  ) : filteredTrucks.length > 0 ? (
+              loadingTrucks ? (
+                <div className={`flex items-center gap-2 p-4 rounded-xl border ${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'
+                  }`}>
+                  <Spin size="small" />
+                  <span className={`text-sm ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
+                    Loading trucks...
+                  </span>
+                </div>
+              ) : filteredTrucks.length > 0 ? (
                 <Select
-                      className="w-full"
-                      placeholder="Search and select a unit..."
-                      value=""
-                      onChange={addTruck}
+                  className="w-full"
+                  placeholder="Search and select a unit..."
+                  value=""
+                  onChange={addTruck}
                   showSearch
-                      loading={loadingTrucks}
+                  loading={loadingTrucks}
                   filterOption={(input, option) => {
-                        const searchText = input.toLowerCase();
-                        const unitNumber = (option?.unitNumber || '').toLowerCase();
-                        const driverName = (option?.driverName || '').toLowerCase();
-                        return unitNumber.includes(searchText) || driverName.includes(searchText);
+                    const searchText = input.toLowerCase();
+                    const unitNumber = (option?.unitNumber || '').toLowerCase();
+                    const driverName = (option?.driverName || '').toLowerCase();
+                    return unitNumber.includes(searchText) || driverName.includes(searchText);
                   }}
                   options={filteredTrucks.map(truck => {
                     const truckId = truck.id || truck._id;
                     const unitNumber = truck.unit_number || 'N/A';
                     const vin = truck.VIN || truck.vin || 'N/A';
-                        let driverId = null;
-                        let driverNames = [];
-                        if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
-                          driverId = truck.driver[0].id;
-                          driverNames = truck.driver
-                            .map((d) => d.full_name)
-                            .filter((name) => name && name.trim());
-                        } else if (truck.driver && typeof truck.driver === 'object' && truck.driver.id) {
-                          driverId = truck.driver.id;
-                          if (truck.driver.full_name) {
-                            driverNames = [truck.driver.full_name];
-                          }
-                        } else if (truck.driver && typeof truck.driver === 'number') {
-                          driverId = truck.driver;
-                        } else if (truck.driver_id) {
-                          driverId = truck.driver_id;
-                        }
-                        const driverName = driverNames.join(' / ');
-                        return {
-                          value: String(truckId),
-                          label: `Unit ${unitNumber}${driverName ? ` - ${driverName}` : ' - No Driver'}`,
-                          unitNumber: unitNumber,
-                          driverName: driverName,
-                        };
-                      })}
-                      notFoundContent={
-                        <div className={`text-center py-4 ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                          No units found
-                        </div>
+                    let driverId = null;
+                    let driverNames = [];
+                    if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
+                      driverId = truck.driver[0].id;
+                      driverNames = truck.driver
+                        .map((d) => d.full_name)
+                        .filter((name) => name && name.trim());
+                    } else if (truck.driver && typeof truck.driver === 'object' && truck.driver.id) {
+                      driverId = truck.driver.id;
+                      if (truck.driver.full_name) {
+                        driverNames = [truck.driver.full_name];
                       }
-                    />
-                  ) : (
-                    <div className={`text-sm p-4 rounded-xl italic ${
-                      currentTheme === 'dark' ? 'bg-white/5 text-white/50' : 'bg-gray-50 text-gray-500'
-                    }`}>
-                      {allTrucks.length === 0 ? 'No trucks available.' : 'All available trucks have been added.'}
+                    } else if (truck.driver && typeof truck.driver === 'number') {
+                      driverId = truck.driver;
+                    } else if (truck.driver_id) {
+                      driverId = truck.driver_id;
+                    }
+                    const driverName = driverNames.join(' / ');
+                    return {
+                      value: String(truckId),
+                      label: `Unit ${unitNumber}${driverName ? ` - ${driverName}` : ' - No Driver'}`,
+                      unitNumber: unitNumber,
+                      driverName: driverName,
+                    };
+                  })}
+                  notFoundContent={
+                    <div className={`text-center py-4 ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                      No units found
                     </div>
-                  )
-                ) : (
-                  <div className={`text-sm p-4 rounded-xl italic ${
-                    currentTheme === 'dark' ? 'bg-white/5 text-white/50' : 'bg-gray-50 text-gray-500'
+                  }
+                />
+              ) : (
+                <div className={`text-sm p-4 rounded-xl italic ${currentTheme === 'dark' ? 'bg-white/5 text-white/50' : 'bg-gray-50 text-gray-500'
                   }`}>
-                    Select an owner to see fleet availability.
-                  </div>
-                )}
+                  {allTrucks.length === 0 ? 'No trucks available.' : 'All available trucks have been added.'}
+                </div>
+              )
+            ) : (
+              <div className={`text-sm p-4 rounded-xl italic ${currentTheme === 'dark' ? 'bg-white/5 text-white/50' : 'bg-gray-50 text-gray-500'
+                }`}>
+                Select an owner to see fleet availability.
+              </div>
+            )}
           </section>
         </div>
 
-        <div className={`px-6 py-4 border-t flex justify-end gap-3 ${
-          currentTheme === 'dark' ? 'border-white/10 bg-white/5' : 'border-black/10 bg-gray-50'
-        }`}>
+        <div className={`px-6 py-4 border-t flex justify-end gap-3 ${currentTheme === 'dark' ? 'border-white/10 bg-white/5' : 'border-black/10 bg-gray-50'
+          }`}>
           <Button onClick={handleClose} className="hover:border-[#F59A6B] hover:text-[#F59A6B]">
             Cancel
           </Button>

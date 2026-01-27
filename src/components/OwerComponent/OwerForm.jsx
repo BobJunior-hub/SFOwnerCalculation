@@ -35,6 +35,8 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
     end_date,
   } = useOwner();
 
+  console.log(trucksData, 'trucksData');
+
   const handleFormSubmit = async () => {
     await handleSubmit(
       (successMsg) => {
@@ -60,8 +62,31 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
     if (!open) {
       resetForm();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    const storedOwner = localStorage.getItem('selectedOwner');
+    if (storedOwner && !selectedOwner) {
+      setSelectedOwner(storedOwner);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleOwnerChange = () => {
+      const storedOwner = localStorage.getItem('selectedOwner');
+      if (storedOwner && storedOwner !== selectedOwner) {
+        setSelectedOwner(storedOwner);
+      }
+    };
+
+    window.addEventListener('ownerChanged', handleOwnerChange);
+    window.addEventListener('storage', handleOwnerChange);
+
+    return () => {
+      window.removeEventListener('ownerChanged', handleOwnerChange);
+      window.removeEventListener('storage', handleOwnerChange);
+    };
+  }, [selectedOwner]);
 
   return (
     <Drawer
@@ -82,17 +107,16 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                   Total Amount of All Units
                 </span>
                 <span
-                  className={`text-lg font-bold mt-1 ${
-                    (() => {
-                      const totalSum = trucksData.reduce((sum, item) => {
-                        const amt = parseFloat(item.totalAmount) || 0;
-                        return sum + amt;
-                      }, 0);
-                      if (totalSum < 0) return currentTheme === 'dark' ? 'text-red-400' : 'text-red-600';
-                      if (totalSum > 0) return currentTheme === 'dark' ? 'text-green-400' : 'text-green-600';
-                      return currentTheme === 'dark' ? 'text-white/70' : 'text-black/70';
-                    })()
-                  }`}
+                  className={`text-lg font-bold mt-1 ${(() => {
+                    const totalSum = trucksData.reduce((sum, item) => {
+                      const amt = parseFloat(item.totalAmount) || 0;
+                      return sum + amt;
+                    }, 0);
+                    if (totalSum < 0) return currentTheme === 'dark' ? 'text-red-400' : 'text-red-600';
+                    if (totalSum > 0) return currentTheme === 'dark' ? 'text-green-400' : 'text-green-600';
+                    return currentTheme === 'dark' ? 'text-white/70' : 'text-black/70';
+                  })()
+                    }`}
                 >
                   {(() => {
                     const totalSum = trucksData.reduce((sum, item) => {
@@ -111,20 +135,36 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                   Total Escrow of All Units
                 </span>
                 <span
-                  className={`text-lg font-bold mt-1 ${
-                    (() => {
-                      const totalEscrow = trucksData.reduce((sum, item) => {
-                        const amt = parseFloat(item.escrow) || 0;
-                        return sum + amt;
-                      }, 0);
-                      if (totalEscrow < 0) return currentTheme === 'dark' ? 'text-red-400' : 'text-red-600';
-                      if (totalEscrow > 0) return currentTheme === 'dark' ? 'text-blue-400' : 'text-blue-600';
-                      return currentTheme === 'dark' ? 'text-white/70' : 'text-black/70';
-                    })()
-                  }`}
-                >
+                  className={`text-lg font-bold mt-1 ${(() => {
+                    const totalEscrow = trucksData.reduce((sum, item) => {
+
+                      if (item.drivers && item.drivers.length > 1) {
+                        const driversEscrow = item.drivers.reduce((driverSum, driver) => {
+                          const amt = parseFloat(driver.escrow) || 0;
+                          return driverSum + amt;
+                        }, 0);
+                        return sum + driversEscrow;
+                      }
+
+                      const amt = parseFloat(item.escrow) || 0;
+                      return sum + amt;
+                    }, 0);
+                    if (totalEscrow < 0) return currentTheme === 'dark' ? 'text-red-400' : 'text-red-600';
+                    if (totalEscrow > 0) return currentTheme === 'dark' ? 'text-blue-400' : 'text-blue-600';
+                    return currentTheme === 'dark' ? 'text-white/70' : 'text-black/70';
+                  })()
+                    }`}>
                   {(() => {
                     const totalEscrow = trucksData.reduce((sum, item) => {
+
+                      if (item.drivers && item.drivers.length > 1) {
+                        const driversEscrow = item.drivers.reduce((driverSum, driver) => {
+                          const amt = parseFloat(driver.escrow) || 0;
+                          return driverSum + amt;
+                        }, 0);
+                        return sum + driversEscrow;
+                      }
+
                       const amt = parseFloat(item.escrow) || 0;
                       return sum + amt;
                     }, 0);
@@ -141,6 +181,7 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
       onClose={handleClose}
       open={open}
       width={900}
+      duration={0.10}
       className={currentTheme === 'dark' ? 'bg-white/5' : 'bg-white'}
       styles={{
         body: {
@@ -176,6 +217,10 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                   value={selectedOwner}
                   onChange={(value) => {
                     setSelectedOwner(value);
+                    if (value) {
+                      localStorage.setItem('selectedOwner', value);
+                      window.dispatchEvent(new Event('ownerChanged'));
+                    }
                   }}
                   showSearch
                   filterOption={(input, option) =>
@@ -282,87 +327,168 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
 
                     {data.status !== 'loading' && !loadingDrivers[data.truckId] && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                            Driver Name
-                          </label>
-                          <Input
-                            className="w-full"
-                            value={data.driverName}
-                            onChange={(e) => updateTruckData(data.truckId, 'driverName', e.target.value)}
-                            placeholder="Enter driver name"
-                            disabled={data.status === 'fetched' && data.driverName}
-                          />
-                        </div>
-                        <div>
-                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                            Company
-                          </label>
-                          <Input
-                            className="w-full"
-                            value={data.company}
-                            onChange={(e) => updateTruckData(data.truckId, 'company', e.target.value)}
-                            placeholder="Enter company"
-                          />
-                        </div>
                         {data.drivers && data.drivers.length > 1 ? (
                           <>
                             {data.drivers.map((driver, index) => (
-                              <div key={driver.id || index}>
-                                <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                                  {driver.full_name} Amount <span className="text-red-500">*</span>
-                                </label>
-                                <InputNumber
-                                  className="w-full"
-                                  value={driver.amount ? parseFloat(driver.amount) : null}
-                                  onChange={(value) => {
-                                    const updatedDrivers = [...(data.drivers || [])];
-                                    updatedDrivers[index] = {
-                                      ...updatedDrivers[index],
-                                      amount: value === null || value === undefined ? '' : String(value),
-                                    };
-                                    const totalAmount = updatedDrivers.reduce((sum, d) => {
-                                      const amt = parseFloat(d.amount) || 0;
-                                      return sum + amt;
-                                    }, 0);
-                                    updateTruckData(data.truckId, 'drivers', updatedDrivers);
-                                    updateTruckData(data.truckId, 'totalAmount', String(totalAmount));
-                                  }}
-                                  placeholder="Enter amount"
-                                  step={0.01}
-                                  controls={true}
-                                  keyboard={true}
-                                  formatter={(value) => {
-                                    if (!value && value !== 0) return '';
-                                    const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-                                    if (isNaN(numValue)) return '';
-                                    return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                                  }}
-                                  parser={(value) => {
-                                    if (!value) return '';
-                                    const cleaned = value.replace(/[^0-9.-]/g, '');
-                                    const num = parseFloat(cleaned);
-                                    return isNaN(num) ? '' : cleaned;
-                                  }}
-                                  onKeyPress={(e) => {
-                                    const char = String.fromCharCode(e.which || e.keyCode);
-                                    if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
-                                      e.preventDefault();
-                                    }
-                                  }}
-                                  style={{
-                                    color: (() => {
-                                      const amt = parseFloat(driver.amount) || 0;
-                                      if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
-                                      if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
-                                      return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
-                                    })(),
-                                    width: '100%'
-                                  }}
-                                />
+                              <div key={driver.id || index} className={`md:col-span-2 ${index > 0 ? 'mt-4 pt-4 border-t ' + (currentTheme === 'dark' ? 'border-white/10' : 'border-black/10') : ''}`}>
+                                <h4 className={`text-sm font-semibold mb-3 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
+                                  Driver {index + 1}: {driver.full_name || `Driver ${index + 1}`}
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                      Driver Name
+                                    </label>
+                                    <Input
+                                      className="w-full"
+                                      value={driver.driverName || driver.full_name || ''}
+                                      onChange={(e) => {
+                                        const updatedDrivers = [...(data.drivers || [])];
+                                        updatedDrivers[index] = {
+                                          ...updatedDrivers[index],
+                                          driverName: e.target.value,
+                                        };
+                                        updateTruckData(data.truckId, 'drivers', updatedDrivers);
+                                      }}
+                                      placeholder="Enter driver name"
+                                      disabled={data.status === 'fetched' && driver.driverName}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                      Company
+                                    </label>
+                                    <Input
+                                      className="w-full"
+                                      value={driver.company || ''}
+                                      onChange={(e) => {
+                                        const updatedDrivers = [...(data.drivers || [])];
+                                        updatedDrivers[index] = {
+                                          ...updatedDrivers[index],
+                                          company: e.target.value,
+                                        };
+                                        updateTruckData(data.truckId, 'drivers', updatedDrivers);
+                                      }}
+                                      placeholder="Enter company"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                      Amount <span className="text-red-500">*</span>
+                                    </label>
+                                    <InputNumber
+                                      className="w-full"
+                                      value={driver.amount ? parseFloat(driver.amount) : null}
+                                      onChange={(value) => {
+                                        const updatedDrivers = [...(data.drivers || [])];
+                                        updatedDrivers[index] = {
+                                          ...updatedDrivers[index],
+                                          amount: value === null || value === undefined ? '' : String(value),
+                                        };
+                                        const totalAmount = updatedDrivers.reduce((sum, d) => {
+                                          const amt = parseFloat(d.amount) || 0;
+                                          return sum + amt;
+                                        }, 0);
+                                        updateTruckData(data.truckId, 'drivers', updatedDrivers);
+                                        updateTruckData(data.truckId, 'totalAmount', String(totalAmount));
+                                      }}
+                                      placeholder="Enter amount"
+                                      step={0.01}
+                                      controls={true}
+                                      keyboard={true}
+                                      formatter={(value) => {
+                                        if (!value && value !== 0) return '';
+                                        const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                                        if (isNaN(numValue)) return '';
+                                        return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                      }}
+                                      parser={(value) => {
+                                        if (!value) return '';
+                                        const cleaned = value.replace(/[^0-9.-]/g, '');
+                                        const num = parseFloat(cleaned);
+                                        return isNaN(num) ? '' : cleaned;
+                                      }}
+                                      onKeyPress={(e) => {
+                                        const char = String.fromCharCode(e.which || e.keyCode);
+                                        if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                          e.preventDefault();
+                                        }
+                                      }}
+                                      style={{
+                                        color: (() => {
+                                          const amt = parseFloat(driver.amount) || 0;
+                                          if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
+                                          if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+                                          return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                                        })(),
+                                        width: '100%'
+                                      }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                      Escrow
+                                    </label>
+                                    <InputNumber
+                                      className="w-full"
+                                      value={driver.escrow ? parseFloat(driver.escrow) : null}
+                                      onChange={(value) => {
+                                        const updatedDrivers = [...(data.drivers || [])];
+                                        updatedDrivers[index] = {
+                                          ...updatedDrivers[index],
+                                          escrow: value === null || value === undefined ? '' : String(value),
+                                        };
+                                        updateTruckData(data.truckId, 'drivers', updatedDrivers);
+                                      }}
+                                      placeholder="Enter escrow (can be positive or negative)"
+                                      step={0.01}
+                                      controls={true}
+                                      keyboard={true}
+                                      formatter={(value) => {
+                                        if (!value && value !== 0) return '';
+                                        const num = parseFloat(value);
+                                        if (isNaN(num)) return '';
+                                        const sign = num < 0 ? '-' : '';
+                                        const absValue = Math.abs(num);
+                                        return `${sign}$ ${absValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                      }}
+                                      parser={(value) => {
+                                        if (!value) return '';
+                                        const cleaned = value.replace(/[^0-9.-]/g, '');
+                                        const num = parseFloat(cleaned);
+                                        return isNaN(num) ? '' : cleaned;
+                                      }}
+                                      onKeyPress={(e) => {
+                                        const char = String.fromCharCode(e.which || e.keyCode);
+                                        if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                          e.preventDefault();
+                                        }
+                                      }}
+                                      style={{ color: currentTheme === 'dark' ? '#60a5fa' : '#2563eb', width: '100%' }}
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                      Note
+                                    </label>
+                                    <TextArea
+                                      rows={2}
+                                      value={driver.note || ''}
+                                      onChange={(e) => {
+                                        const updatedDrivers = [...(data.drivers || [])];
+                                        updatedDrivers[index] = {
+                                          ...updatedDrivers[index],
+                                          note: e.target.value,
+                                        };
+                                        updateTruckData(data.truckId, 'drivers', updatedDrivers);
+                                      }}
+                                      placeholder="Enter note"
+                                    />
+                                  </div>
+                                </div>
                               </div>
                             ))}
-                            <div>
+                            <div className="md:col-span-2">
                               <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
                                 Total Amount <span className="text-red-500">*</span>
                               </label>
@@ -388,126 +514,165 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                                 }}
                               />
                             </div>
+                            {data.pdf_file && (
+                              <div className="md:col-span-2">
+                                <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                  PDF Statement
+                                </label>
+                                <a
+                                  href={data.pdf_file}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`text-xs px-3 py-2 rounded border inline-block ${currentTheme === 'dark' ? 'border-white/20 text-white/70 hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                                  View PDF
+                                </a>
+                              </div>
+                            )}
                           </>
                         ) : (
-                          <div>
-                            <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                              Total Amount <span className="text-red-500">*</span>
-                            </label>
-                            <InputNumber
-                              className="w-full"
-                              value={data.totalAmount ? parseFloat(data.totalAmount) : null}
-                              onChange={(value) => {
-                                if (value === null || value === undefined) {
-                                  updateTruckData(data.truckId, 'totalAmount', '');
-                                  return;
-                                }
-                                if (typeof value === 'number' && !isNaN(value)) {
-                                  updateTruckData(data.truckId, 'totalAmount', String(value));
-                                }
-                              }}
-                              placeholder="Enter amount"
-                              step={0.01}
-                              controls={true}
-                              keyboard={true}
-                              formatter={(value) => {
-                                if (!value && value !== 0) return '';
-                                const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-                                if (isNaN(numValue)) return '';
-                                return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                              }}
-                              parser={(value) => {
-                                if (!value) return '';
-                                const cleaned = value.replace(/[^0-9.-]/g, '');
-                                const num = parseFloat(cleaned);
-                                return isNaN(num) ? '' : cleaned;
-                              }}
-                              onKeyPress={(e) => {
-                                const char = String.fromCharCode(e.which || e.keyCode);
-                                if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
-                                  e.preventDefault();
-                                }
-                              }}
-                              style={{
-                                color: (() => {
-                                  const amt = parseFloat(data.totalAmount) || 0;
-                                  if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
-                                  if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
-                                  return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
-                                })(),
-                                width: '100%'
-                              }}
-                            />
-                          </div>
+                          <>
+                            <div>
+                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                Driver Name
+                              </label>
+                              <Input
+                                className="w-full"
+                                value={data.driverName}
+                                onChange={(e) => updateTruckData(data.truckId, 'driverName', e.target.value)}
+                                placeholder="Enter driver name"
+                                disabled={data.status === 'fetched' && data.driverName}
+                              />
+                            </div>
+                            <div>
+                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                Company
+                              </label>
+                              <Input
+                                className="w-full"
+                                value={data.company}
+                                onChange={(e) => updateTruckData(data.truckId, 'company', e.target.value)}
+                                placeholder="Enter company"
+                              />
+                            </div>
+                            <div>
+                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                Total Amount <span className="text-red-500">*</span>
+                              </label>
+                              <InputNumber
+                                className="w-full"
+                                value={data.totalAmount ? parseFloat(data.totalAmount) : null}
+                                onChange={(value) => {
+                                  if (value === null || value === undefined) {
+                                    updateTruckData(data.truckId, 'totalAmount', '');
+                                    return;
+                                  }
+                                  if (typeof value === 'number' && !isNaN(value)) {
+                                    updateTruckData(data.truckId, 'totalAmount', String(value));
+                                  }
+                                }}
+                                placeholder="Enter amount"
+                                step={0.01}
+                                controls={true}
+                                keyboard={true}
+                                formatter={(value) => {
+                                  if (!value && value !== 0) return '';
+                                  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                                  if (isNaN(numValue)) return '';
+                                  return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                }}
+                                parser={(value) => {
+                                  if (!value) return '';
+                                  const cleaned = value.replace(/[^0-9.-]/g, '');
+                                  const num = parseFloat(cleaned);
+                                  return isNaN(num) ? '' : cleaned;
+                                }}
+                                onKeyPress={(e) => {
+                                  const char = String.fromCharCode(e.which || e.keyCode);
+                                  if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                    e.preventDefault();
+                                  }
+                                }}
+                                style={{
+                                  color: (() => {
+                                    const amt = parseFloat(data.totalAmount) || 0;
+                                    if (amt < 0) return currentTheme === 'dark' ? '#f87171' : '#dc2626';
+                                    if (amt > 0) return currentTheme === 'dark' ? '#4ade80' : '#16a34a';
+                                    return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                                  })(),
+                                  width: '100%'
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                Escrow
+                              </label>
+                              <InputNumber
+                                className="w-full"
+                                value={data.escrow ? parseFloat(data.escrow) : null}
+                                onChange={(value) => {
+                                  if (value === null || value === undefined) {
+                                    updateTruckData(data.truckId, 'escrow', '');
+                                    return;
+                                  }
+                                  if (typeof value === 'number' && !isNaN(value)) {
+                                    updateTruckData(data.truckId, 'escrow', String(value));
+                                  }
+                                }}
+                                placeholder="Enter escrow (can be positive or negative)"
+                                step={0.01}
+                                controls={true}
+                                keyboard={true}
+                                formatter={(value) => {
+                                  if (!value && value !== 0) return '';
+                                  const num = parseFloat(value);
+                                  if (isNaN(num)) return '';
+                                  const sign = num < 0 ? '-' : '';
+                                  const absValue = Math.abs(num);
+                                  return `${sign}$ ${absValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                }}
+                                parser={(value) => {
+                                  if (!value) return '';
+                                  const cleaned = value.replace(/[^0-9.-]/g, '');
+                                  const num = parseFloat(cleaned);
+                                  return isNaN(num) ? '' : cleaned;
+                                }}
+                                onKeyPress={(e) => {
+                                  const char = String.fromCharCode(e.which || e.keyCode);
+                                  if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                    e.preventDefault();
+                                  }
+                                }}
+                                style={{ color: currentTheme === 'dark' ? '#60a5fa' : '#2563eb', width: '100%' }}
+                              />
+                            </div>
+                            {data.pdf_file && (
+                              <div>
+                                <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                  PDF Statement
+                                </label>
+                                <a
+                                  href={data.pdf_file}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`text-xs px-3 py-2 rounded border inline-block ${currentTheme === 'dark' ? 'border-white/20 text-white/70 hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                                  View PDF
+                                </a>
+                              </div>
+                            )}
+                            <div className="md:col-span-2">
+                              <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
+                                Note
+                              </label>
+                              <TextArea
+                                rows={2}
+                                value={data.note}
+                                onChange={(e) => updateTruckData(data.truckId, 'note', e.target.value)}
+                                placeholder="Enter note"
+                              />
+                            </div>
+                          </>
                         )}
-                        <div>
-                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                            Escrow
-                          </label>
-                          <InputNumber
-                            className="w-full"
-                            value={data.escrow ? parseFloat(data.escrow) : null}
-                            onChange={(value) => {
-                              if (value === null || value === undefined) {
-                                updateTruckData(data.truckId, 'escrow', '');
-                                return;
-                              }
-                              if (typeof value === 'number' && !isNaN(value)) {
-                                updateTruckData(data.truckId, 'escrow', String(value));
-                              }
-                            }}
-                            placeholder="Enter escrow (can be positive or negative)"
-                            step={0.01}
-                            controls={true}
-                            keyboard={true}
-                            formatter={(value) => {
-                              if (!value && value !== 0) return '';
-                              const num = parseFloat(value);
-                              if (isNaN(num)) return '';
-                              const sign = num < 0 ? '-' : '';
-                              const absValue = Math.abs(num);
-                              return `${sign}$ ${absValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                            }}
-                            parser={(value) => {
-                              if (!value) return '';
-                              const cleaned = value.replace(/[^0-9.-]/g, '');
-                              const num = parseFloat(cleaned);
-                              return isNaN(num) ? '' : cleaned;
-                            }}
-                            onKeyPress={(e) => {
-                              const char = String.fromCharCode(e.which || e.keyCode);
-                              if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                            style={{ color: currentTheme === 'dark' ? '#60a5fa' : '#2563eb', width: '100%' }}
-                          />
-                        </div>
-                        {data.pdf && (
-                          <div>
-                            <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                              PDF Statement
-                            </label>
-                            <a
-                              href={data.pdf}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`text-xs px-3 py-2 rounded border inline-block ${currentTheme === 'dark' ? 'border-white/20 text-white/70 hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                              View PDF
-                            </a>
-                          </div>
-                        )}
-                        <div className="md:col-span-2">
-                          <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                            Note
-                          </label>
-                          <TextArea
-                            rows={2}
-                            value={data.note}
-                            onChange={(e) => updateTruckData(data.truckId, 'note', e.target.value)}
-                            placeholder="Enter note"
-                          />
-                        </div>
                       </div>
                     )}
                   </div>
@@ -555,8 +720,7 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
             onClick={handleFormSubmit}
             loading={isSubmitting}
             className="bg-[#E77843] hover:bg-[#F59A6B] border-[#E77843] hover:border-[#F59A6B]"
-            icon={<SaveOutlined />}
-          >
+            icon={<SaveOutlined />}>
             Create Calculation
           </Button>
         </div>

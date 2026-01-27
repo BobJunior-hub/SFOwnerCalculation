@@ -81,15 +81,15 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
 
           message.success('Owner calculation deleted successfully');
 
-          // Invalidate and refetch the owner data
+
           queryClient.invalidateQueries({ queryKey: ['owner'] });
 
-          // Also update local state immediately
+
           setCalculations(prev =>
             prev.filter(item => item.id !== owner.id)
           );
 
-          // Call onRefresh if provided
+
           if (onRefresh) {
             onRefresh();
           }

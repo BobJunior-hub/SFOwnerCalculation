@@ -27,9 +27,40 @@ export const useOwner = () => {
   const endDateForPicker = end_date ? dayjs(end_date) : null;
 
   useEffect(() => {
+    const storedOwner = localStorage.getItem('selectedOwner');
+    if (storedOwner && !selectedOwner) {
+      setSelectedOwner(storedOwner);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleOwnerChange = () => {
+      const storedOwner = localStorage.getItem('selectedOwner');
+      if (storedOwner && storedOwner !== selectedOwner) {
+        setSelectedOwner(storedOwner);
+      }
+    };
+
+    window.addEventListener('ownerChanged', handleOwnerChange);
+    window.addEventListener('storage', handleOwnerChange);
+
+    return () => {
+      window.removeEventListener('ownerChanged', handleOwnerChange);
+      window.removeEventListener('storage', handleOwnerChange);
+    };
+  }, [selectedOwner]);
+
+  useEffect(() => {
     setSelectedTruckIds(new Set());
     setTrucksData([]);
     setLoadingDrivers({});
+  }, [selectedOwner]);
+
+  useEffect(() => {
+    if (selectedOwner) {
+      localStorage.setItem('selectedOwner', selectedOwner);
+      window.dispatchEvent(new Event('ownerChanged'));
+    }
   }, [selectedOwner]);
 
   const extractDriverInfo = (data) => {
@@ -242,9 +273,18 @@ export const useOwner = () => {
       });
 
       const driverResults = await Promise.all(driverPromises);
-      const totalAmount = driverResults.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-      const allCompanies = driverResults.map((d) => d.company).filter((c) => c).join(", ");
-      const allNotes = driverResults.map((d) => d.note).filter((n) => n).join("; ");
+      const totalAmount = driverResults.reduce(
+        (sum, d) => sum + (parseFloat(d.amount) || 0),
+        0
+      );
+      const allCompanies = driverResults
+        .map((d) => d.company)
+        .filter((c) => c)
+        .join(", ");
+      const allNotes = driverResults
+        .map((d) => d.note)
+        .filter((n) => n)
+        .join("; ");
       const firstPdf = driverResults.find((d) => d.pdf)?.pdf || null;
 
       setTrucksData((prev) =>
@@ -331,17 +371,22 @@ export const useOwner = () => {
       typeof truck.driver === "object" &&
       truck.driver.id
     ) {
-      drivers = [{
-        id: truck.driver.id,
-        full_name: truck.driver.full_name || "",
-      }];
+      drivers = [
+        {
+          id: truck.driver.id,
+          full_name: truck.driver.full_name || "",
+        },
+      ];
     } else if (truck.driver && typeof truck.driver === "number") {
       drivers = [{ id: truck.driver, full_name: "" }];
     } else if (truck.driver_id) {
       drivers = [{ id: truck.driver_id, full_name: "" }];
     }
 
-    const driverNames = drivers.map((d) => d.full_name).filter((name) => name).join(" / ");
+    const driverNames = drivers
+      .map((d) => d.full_name)
+      .filter((name) => name)
+      .join(" / ");
     const driverId = drivers.length > 0 ? drivers[0].id : null;
 
     const newItem = {
@@ -380,7 +425,6 @@ export const useOwner = () => {
       );
     }
 
-    // Clear the selected unit value after adding
     setSelectedUnitValue(null);
   };
 
@@ -490,23 +534,81 @@ export const useOwner = () => {
     }
 
     for (const item of trucksData) {
-      const amountField = item.totalAmount || item.amount || "";
-      if (!amountField || amountField === "" || amountField === "0" || amountField === 0) {
-        if (onError) onError(`Total Amount is required and cannot be 0 for Unit ${item.unitNumber || item.truckId}.`);
-        return;
-      }
+      // If multiple drivers, validate each driver's amount
+      if (
+        item.drivers &&
+        Array.isArray(item.drivers) &&
+        item.drivers.length > 1
+      ) {
+        for (const driver of item.drivers) {
+          const driverAmount = driver.amount || "";
+          if (
+            !driverAmount ||
+            driverAmount === "" ||
+            driverAmount === "0" ||
+            driverAmount === 0
+          ) {
+            if (onError)
+              onError(
+                `Amount is required and cannot be 0 for ${
+                  driver.full_name || "Driver"
+                } in Unit ${item.unitNumber || item.truckId}.`
+              );
+            return;
+          }
 
-      let amountValue = 0;
-      if (typeof amountField === "string") {
-        const cleaned = amountField.replace(/[^0-9.-]/g, "");
-        amountValue = parseFloat(cleaned) || 0;
+          let amountValue = 0;
+          if (typeof driverAmount === "string") {
+            const cleaned = driverAmount.replace(/[^0-9.-]/g, "");
+            amountValue = parseFloat(cleaned) || 0;
+          } else {
+            amountValue = parseFloat(driverAmount) || 0;
+          }
+
+          if (amountValue === 0 || isNaN(amountValue)) {
+            if (onError)
+              onError(
+                `Amount is required and cannot be 0 for ${
+                  driver.full_name || "Driver"
+                } in Unit ${item.unitNumber || item.truckId}.`
+              );
+            return;
+          }
+        }
       } else {
-        amountValue = parseFloat(amountField) || 0;
-      }
+        const amountField = item.totalAmount || item.amount || "";
+        if (
+          !amountField ||
+          amountField === "" ||
+          amountField === "0" ||
+          amountField === 0
+        ) {
+          if (onError)
+            onError(
+              `Total Amount is required and cannot be 0 for Unit ${
+                item.unitNumber || item.truckId
+              }.`
+            );
+          return;
+        }
 
-      if (amountValue === 0 || isNaN(amountValue)) {
-        if (onError) onError(`Total Amount is required and cannot be 0 for Unit ${item.unitNumber || item.truckId}.`);
-        return;
+        let amountValue = 0;
+        if (typeof amountField === "string") {
+          const cleaned = amountField.replace(/[^0-9.-]/g, "");
+          amountValue = parseFloat(cleaned) || 0;
+        } else {
+          amountValue = parseFloat(amountField) || 0;
+        }
+
+        if (amountValue === 0 || isNaN(amountValue)) {
+          if (onError)
+            onError(
+              `Total Amount is required and cannot be 0 for Unit ${
+                item.unitNumber || item.truckId
+              }.`
+            );
+          return;
+        }
       }
     }
 
@@ -517,68 +619,131 @@ export const useOwner = () => {
       const endDateStr = end_date;
 
       const payloadUnits = trucksData
-        .map((item) => {
+        .flatMap((item) => {
           const truck = trucks?.find((t) => {
             const tId = t.id || t._id;
             return String(tId) === String(item.truckId);
           });
 
           if (!truck) {
-            return null;
+            return [];
           }
 
           const truckId = Number(truck.id || truck._id);
 
-          let amountValue = 0;
-          const amountField = item.totalAmount || item.amount || "";
-          if (amountField) {
-            if (typeof amountField === "string") {
-              const cleaned = amountField.replace(/[^0-9.-]/g, "");
-              amountValue = parseFloat(cleaned) || 0;
-            } else {
-              amountValue = parseFloat(amountField) || 0;
-            }
-          }
-
-          let escrowValue = 0;
           if (
-            item.escrow !== null &&
-            item.escrow !== undefined &&
-            item.escrow !== ""
+            item.drivers &&
+            Array.isArray(item.drivers) &&
+            item.drivers.length > 1
           ) {
-            if (typeof item.escrow === "string") {
-              const cleaned = item.escrow.replace(/[^0-9.-]/g, "");
-              escrowValue = parseFloat(cleaned) || 0;
-            } else {
-              escrowValue = parseFloat(item.escrow) || 0;
-            }
-          }
+            return item.drivers.map((driver) => {
+              let amountValue = 0;
+              const amountField = driver.amount || "";
+              if (amountField) {
+                if (typeof amountField === "string") {
+                  const cleaned = amountField.replace(/[^0-9.-]/g, "");
+                  amountValue = parseFloat(cleaned) || 0;
+                } else {
+                  amountValue = parseFloat(amountField) || 0;
+                }
+              }
 
-          const unitPayload = {
-            truck: truckId,
-            amount: amountValue.toFixed(2),
-            escrow: escrowValue.toFixed(2),
-          };
+              let escrowValue = 0;
+              if (
+                driver.escrow !== null &&
+                driver.escrow !== undefined &&
+                driver.escrow !== ""
+              ) {
+                if (typeof driver.escrow === "string") {
+                  const cleaned = driver.escrow.replace(/[^0-9.-]/g, "");
+                  escrowValue = parseFloat(cleaned) || 0;
+                } else {
+                  escrowValue = parseFloat(driver.escrow) || 0;
+                }
+              }
 
-          if (item.driverName && item.driverName.trim()) {
-            unitPayload.driver = item.driverName.trim();
-          }
+              const unitPayload = {
+                truck: truckId,
+                amount: amountValue.toFixed(2),
+                escrow: escrowValue.toFixed(2),
+              };
 
-          if (item.driverId) {
-            unitPayload.driver_id = Number(item.driverId);
-          }
+              const driverName = driver.driverName || driver.full_name || "";
+              if (driverName && driverName.trim()) {
+                unitPayload.driver = driverName.trim();
+              }
 
-          if (item.statementId) {
-            unitPayload.statement = Number(item.statementId);
-          }
+              if (driver.id) {
+                unitPayload.driver_id = Number(driver.id);
+              }
 
-          if (item.note && item.note.trim()) {
-            unitPayload.note = item.note.trim();
+              if (driver.statementId) {
+                unitPayload.statement = Number(driver.statementId);
+              }
+
+              if (driver.note && driver.note.trim()) {
+                unitPayload.note = driver.note.trim();
+              } else {
+                unitPayload.note = "";
+              }
+
+              return unitPayload;
+            });
           } else {
-            unitPayload.note = "";
-          }
+            let amountValue = 0;
+            const amountField = item.totalAmount || item.amount || "";
+            if (amountField) {
+              if (typeof amountField === "string") {
+                const cleaned = amountField.replace(/[^0-9.-]/g, "");
+                amountValue = parseFloat(cleaned) || 0;
+              } else {
+                amountValue = parseFloat(amountField) || 0;
+              }
+            }
 
-          return unitPayload;
+            let escrowValue = 0;
+            if (
+              item.escrow !== null &&
+              item.escrow !== undefined &&
+              item.escrow !== ""
+            ) {
+              if (typeof item.escrow === "string") {
+                const cleaned = item.escrow.replace(/[^0-9.-]/g, "");
+                escrowValue = parseFloat(cleaned) || 0;
+              } else {
+                escrowValue = parseFloat(item.escrow) || 0;
+              }
+            }
+
+            const unitPayload = {
+              truck: truckId,
+              amount: amountValue.toFixed(2),
+              escrow: escrowValue.toFixed(2),
+            };
+
+            if (item.driverName && item.driverName.trim()) {
+              unitPayload.driver = item.driverName.trim();
+            }
+
+            if (item.driverId) {
+              unitPayload.driver_id = Number(item.driverId);
+            }
+
+            const driverStatementId =
+              item.drivers?.find((d) => d.statementId)?.statementId ||
+              item.statementId;
+            if (driverStatementId) {
+              unitPayload.statement = Number(driverStatementId);
+            }
+
+            if (item.note && item.note.trim()) {
+              unitPayload.note = item.note.trim();
+            } else {
+              unitPayload.note = "";
+            }
+
+            return [unitPayload];
+          }
         })
         .filter((unit) => unit !== null);
 
@@ -623,7 +788,10 @@ export const useOwner = () => {
   };
 
   const resetForm = () => {
-    setSelectedOwner("");
+    const storedOwner = localStorage.getItem('selectedOwner');
+    if (storedOwner) {
+      setSelectedOwner(storedOwner);
+    }
     setStart_date(undefined);
     setEnd_date(null);
     setSelectedTruckIds(new Set());
@@ -639,16 +807,26 @@ export const useOwner = () => {
       if (!selectedTruckIds.has(truckId)) {
         const unitNumber = truck.unit_number || "N/A";
         let driverNames = [];
-        if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
+        if (
+          truck.driver &&
+          Array.isArray(truck.driver) &&
+          truck.driver.length > 0
+        ) {
           driverNames = truck.driver
             .map((d) => d.full_name)
             .filter((name) => name && name.trim());
-        } else if (truck.driver && typeof truck.driver === "object" && truck.driver.full_name) {
+        } else if (
+          truck.driver &&
+          typeof truck.driver === "object" &&
+          truck.driver.full_name
+        ) {
           driverNames = [truck.driver.full_name];
         }
         const driverName = driverNames.join(" / ");
         Options.push({
-          label: `Unit ${unitNumber}${driverName ? ` - ${driverName}` : " - No Driver"}`,
+          label: `Unit ${unitNumber}${
+            driverName ? ` - ${driverName}` : " - No Driver"
+          }`,
           value: String(truckId),
           unitNumber: unitNumber,
           driverName: driverName,

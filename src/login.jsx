@@ -1,6 +1,6 @@
+import { LockOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MailOutlined, LockOutlined, UserAddOutlined } from "@ant-design/icons";
 import { login, setAuthToken } from "./api";
 
 export default function LoginPage() {
@@ -39,7 +39,17 @@ export default function LoginPage() {
         sessionStorage.setItem("user", JSON.stringify(userData));
       }
 
-        navigate("/analytics");
+      const isOwnerDepartment = userData?.department?.toLowerCase() === 'owner';
+      if (!isOwnerDepartment && !localStorage.getItem('selectedOwner')) {
+        const defaultOwners = ['Yulduz', 'Sohib', 'Bobur'];
+        if (defaultOwners.length > 0) {
+          localStorage.setItem('selectedOwner', defaultOwners[0]);
+        }
+      } else if (isOwnerDepartment && userData?.username) {
+        localStorage.setItem('selectedOwner', userData.username);
+      }
+
+      navigate("/analytics");
     } catch (err) {
       setErrorMsg(err.message || "Something went wrong");
     } finally {
@@ -55,7 +65,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {errorMsg && <p className="text-red-500 m-0 text-sm">{errorMsg}</p>}
           <div className="flex items-center gap-2 p-2 border border-gray-300 rounded">
-            <UserAddOutlined/>
+            <UserAddOutlined />
             <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Username" type="username" className="flex-1 border-none outline-none text-base" />
           </div>
           <div className="flex items-center gap-2 p-2 border border-gray-300 rounded">
