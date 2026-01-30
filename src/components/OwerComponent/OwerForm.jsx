@@ -498,9 +498,15 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                                 disabled={true}
                                 formatter={(value) => {
                                   if (!value && value !== 0) return '';
-                                  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-                                  if (isNaN(numValue)) return '';
-                                  return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                  const rawNumber =
+                                    typeof value === 'string'
+                                      ? parseFloat(value.replace(/[^0-9.-]/g, ''))
+                                      : Number(value);
+                                  if (isNaN(rawNumber)) return '';
+                                  const fixed = Number(rawNumber.toFixed(2));
+                                  const [intPart, decPart] = fixed.toFixed(2).split('.');
+                                  const intWithCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                  return `$ ${intWithCommas}.${decPart}`;
                                 }}
                                 style={{
                                   color: (() => {
@@ -567,7 +573,8 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                                     return;
                                   }
                                   if (typeof value === 'number' && !isNaN(value)) {
-                                    updateTruckData(data.truckId, 'totalAmount', String(value));
+                                    const fixed = Number(value.toFixed(2));
+                                    updateTruckData(data.truckId, 'totalAmount', fixed.toFixed(2));
                                   }
                                 }}
                                 placeholder="Enter amount"
@@ -576,15 +583,23 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                                 keyboard={true}
                                 formatter={(value) => {
                                   if (!value && value !== 0) return '';
-                                  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-                                  if (isNaN(numValue)) return '';
-                                  return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                  const rawNumber =
+                                    typeof value === 'string'
+                                      ? parseFloat(value.replace(/[^0-9.-]/g, ''))
+                                      : Number(value);
+                                  if (isNaN(rawNumber)) return '';
+                                  const fixed = Number(rawNumber.toFixed(2));
+                                  const [intPart, decPart] = fixed.toFixed(2).split('.');
+                                  const intWithCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                  return `$ ${intWithCommas}.${decPart}`;
                                 }}
                                 parser={(value) => {
                                   if (!value) return '';
                                   const cleaned = value.replace(/[^0-9.-]/g, '');
                                   const num = parseFloat(cleaned);
-                                  return isNaN(num) ? '' : cleaned;
+                                  if (isNaN(num)) return '';
+                                  const fixed = Number(num.toFixed(2));
+                                  return fixed;
                                 }}
                                 onKeyPress={(e) => {
                                   const char = String.fromCharCode(e.which || e.keyCode);

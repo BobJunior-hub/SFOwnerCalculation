@@ -99,8 +99,12 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
     const vin = truck.VIN || truck.vin || 'N/A';
 
     let driverId = null;
+    let secondaryDriverId = null;
     if (truck.driver && Array.isArray(truck.driver) && truck.driver.length > 0) {
       driverId = truck.driver[0].id;
+      if (truck.driver.length > 1 && truck.driver[1]?.id) {
+        secondaryDriverId = truck.driver[1].id;
+      }
     } else if (truck.driver && typeof truck.driver === 'object' && truck.driver.id) {
       driverId = truck.driver.id;
     } else if (truck.driver && typeof truck.driver === 'number') {
@@ -114,6 +118,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
       unitNumber: unitNumber,
       vin: vin,
       driverId: driverId,
+      secondaryDriverId: secondaryDriverId || null,
       driverName: '',
       amount: '',
       escrow: '',
@@ -127,6 +132,9 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
 
     if (driverId) {
       await fetchDriverData(newItem, driverId);
+      if (secondaryDriverId) {
+        await fetchAdditionalDriverAmount(newItem, secondaryDriverId);
+      }
     } else {
       setTrucksData(prev => prev.map(item =>
         item.truckId === newItem.truckId
@@ -164,10 +172,13 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
       companyName = data.company_name || data.carrier_company || '';
     }
 
+    const rawAmount = data.total_amount ?? data.amount ?? 0;
+    const numericAmount = parseFloat(rawAmount) || 0;
+
     return {
       driverName,
       companyName,
-      amount: data.total_amount || data.amount || 0,
+      amount: Number(numericAmount.toFixed(2)),
       note: data.note || '',
       statementId: data.id || null,
     };
@@ -241,6 +252,67 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
         delete newState[item.truckId];
         return newState;
       });
+    }
+  };
+
+  const fetchAdditionalDriverAmount = async (item, driverId) => {
+    if (!driverId || !dateRange || !dateRange[0] || !dateRange[1]) {
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        driver: String(driverId),
+        start_date: dateRange[0].format('YYYY-MM-DD'),
+        end_date: dateRange[1].format('YYYY-MM-DD'),
+      });
+
+      const result = await apiRequest(`/calculations/statement-by-driver/?${params.toString()}`);
+
+      let driverData = null;
+      if (result && Array.isArray(result) && result.length > 0) {
+        driverData = result[0];
+      } else if (result && typeof result === 'object' && !Array.isArray(result)) {
+        driverData = result;
+      }
+
+      if (!driverData) {
+        return;
+      }
+
+      const { driverName, amount } = extractDriverInfo(driverData);
+
+      setTrucksData(prev =>
+        prev.map(current => {
+          if (current.truckId !== item.truckId) return current;
+          let currentAmount = 0;
+          if (current.amount) {
+            if (typeof current.amount === 'string') {
+              const cleaned = current.amount.replace(/[^0-9.-]/g, '');
+              currentAmount = parseFloat(cleaned) || 0;
+            } else {
+              currentAmount = parseFloat(current.amount) || 0;
+            }
+          }
+
+          const additionalAmount = parseFloat(amount) || 0;
+          const newAmount = (currentAmount + additionalAmount).toFixed(2);
+          const existingNames = current.driverName
+            ? current.driverName.split(' / ').map(n => n.trim()).filter(Boolean)
+            : [];
+          if (driverName && !existingNames.includes(driverName)) {
+            existingNames.push(driverName);
+          }
+
+          return {
+            ...current,
+            amount: String(newAmount),
+            driverName: existingNames.join(' / '),
+          };
+        })
+      );
+    } catch {
+      return;
     }
   };
 
@@ -753,12 +825,20 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                           <Input
                             className="w-full"
                             value={data.amount}
-                            onChange={(value) => updateTruckData(data.truckId, 'amount', value ? String(value) : '')}
+                            onChange={(e) => {
+                              const inputValue = e.target.value;
+                              updateTruckData(data.truckId, 'amount', inputValue);
+                            }}
+                            onBlur={() => {
+                              let numeric = 0;
+                              if (data.amount !== null && data.amount !== undefined && data.amount !== '') {
+                                const cleaned = String(data.amount).replace(/[^0-9.-]/g, '');
+                                numeric = parseFloat(cleaned) || 0;
+                              }
+                              const fixed = Number(numeric.toFixed(2));
+                              updateTruckData(data.truckId, 'amount', fixed.toFixed(2));
+                            }}
                             placeholder="Enter amount"
-                            min={0}
-                            step={0.01}
-                            formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
                             style={{
                               color: (() => {
                                 const amt = parseFloat(data.amount) || 0;
@@ -767,7 +847,8 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                                 return currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
                               })()
                             }}
-                            required={true} />
+                            required={true}
+                          />
                         </div>
                         <div>
                           <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
