@@ -108,11 +108,15 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) =
 
         const amount = fetchedDriverData.total_amount || fetchedDriverData.amount || 0;
         const escrow = fetchedDriverData.escrow || fetchedDriverData.total_escrow || 0;
+        const pdfUrl = fetchedDriverData.pdf_file || fetchedDriverData.pdf_file_url || fetchedDriverData.statement?.pdf_file || fetchedDriverData.statement?.pdf_file_url || null;
+        const statementId = fetchedDriverData.id ?? fetchedDriverData.statement?.id ?? fetchedDriverData.statement ?? fetchedDriverData.statement_id ?? null;
 
         setDriverData({
           driverName: driverName,
           amount: amount,
           escrow: escrow,
+          pdfUrl: pdfUrl,
+          statementId: statementId,
         });
 
         form.setFieldsValue({
@@ -136,11 +140,15 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) =
 
         const amount = result.total_amount || result.amount || 0;
         const escrow = result.escrow || result.total_escrow || 0;
+        const pdfUrl = result.pdf_file || result.pdf_file_url || result.statement?.pdf_file || result.statement?.pdf_file_url || null;
+        const statementId = result.id ?? result.statement?.id ?? result.statement ?? result.statement_id ?? null;
 
         setDriverData({
           driverName: driverName,
           amount: amount,
           escrow: escrow,
+          pdfUrl: pdfUrl,
+          statementId: statementId,
         });
 
         form.setFieldsValue({
@@ -228,6 +236,11 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) =
         payload.note = values.note.trim();
       }
 
+      const statementId = driverData?.statementId ?? (deduction?.statement?.id ?? deduction?.statement ?? deduction?.statement_id ?? null);
+      if (statementId) {
+        payload.statement = Number(statementId);
+      }
+
       const calculationUnitPayload = {
         owner: Number(ownerId),
         driver: values.driver || '',
@@ -243,6 +256,10 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) =
 
       if (values.note && values.note.trim()) {
         calculationUnitPayload.note = values.note.trim();
+      }
+
+      if (statementId) {
+        calculationUnitPayload.statement = Number(statementId);
       }
 
       if (deduction && deduction.id) {
@@ -379,19 +396,37 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) =
 
                 if (selectedTruck) {
                   let driverNames = [];
+                  let driverId = null;
+
                   if (selectedTruck.driver && Array.isArray(selectedTruck.driver) && selectedTruck.driver.length > 0) {
                     driverNames = selectedTruck.driver
                       .map((d) => d.full_name)
                       .filter((name) => name && name.trim());
-                  } else if (selectedTruck.driver && typeof selectedTruck.driver === 'object' && selectedTruck.driver.full_name) {
-                    driverNames = [selectedTruck.driver.full_name];
+                    driverId = selectedTruck.driver[0]?.id ?? selectedTruck.driver[0]?._id ?? null;
+                  } else if (selectedTruck.driver && typeof selectedTruck.driver === 'object') {
+                    if (selectedTruck.driver.full_name) {
+                      driverNames = [selectedTruck.driver.full_name];
+                    }
+                    driverId = selectedTruck.driver.id ?? selectedTruck.driver._id ?? null;
                   }
-                  const driverName = driverNames.join(' / ');
 
+                  if (!driverId && selectedTruck.driver_id) {
+                    driverId = selectedTruck.driver_id;
+                  }
+
+                  const driverName = driverNames.join(' / ');
                   form.setFieldsValue({ driver: driverName || '' });
+
+                  if (driverId && calculation?.start_date && calculation?.end_date) {
+                    fetchDriverStatement(driverId);
+                  } else {
+                    form.setFieldsValue({ amount: undefined, escrow: undefined });
+                    setDriverData(null);
+                  }
                 }
               } else {
-                form.setFieldsValue({ driver: '' });
+                form.setFieldsValue({ driver: '', amount: undefined, escrow: undefined });
+                setDriverData(null);
               }
             }}
             filterOption={(input, option) => {
@@ -450,8 +485,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) =
 
         <Form.Item
           label={<span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Amount</span>}
-          shouldUpdate={(prevValues, currentValues) => prevValues.amount !== currentValues.amount}
-        >
+          shouldUpdate={(prevValues, currentValues) => prevValues.amount !== currentValues.amount}>
           {({ getFieldValue }) => {
             const amountValue = getFieldValue('amount');
             const amt = parseFloat(amountValue) || 0;
@@ -487,8 +521,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation, deduction }) =
                   style={{
                     color: color,
                     width: '100%'
-                  }}
-                />
+                  }} />
               </Form.Item>
             );
           }}

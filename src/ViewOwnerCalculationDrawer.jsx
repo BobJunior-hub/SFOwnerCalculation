@@ -664,8 +664,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                   const truckKey = unit.truck?.unit_number || unit.truck?.id || `no-truck-${unit.id}`;
                   if (!groupedUnits[truckKey]) {
                     groupedUnits[truckKey] = [];
-                  }
-                  groupedUnits[truckKey].push(unit);
+                  } groupedUnits[truckKey].push(unit);
                 });
 
                 return Object.entries(groupedUnits).map(([truckKey, units]) => {
@@ -809,23 +808,23 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                                   </div>
                                   <div>
                                     <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Note</div>
-                                    <div className="flex items-start justify-between gap-4">
-                                      <div className={`font-semibold flex-1 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-                                        {note && note.trim() !== '' ? note : '-'}
-                                      </div>
-                                      {pdfUrl && (
-                                        <a
-                                          href={pdfUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className={`flex-shrink-0 inline-block px-4 py-2 rounded ${currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'} text-white font-medium transition-colors text-sm`}>
-                                          View PDF Statement
-                                        </a>
-                                      )}
+                                    <div className={`font-semibold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
+                                      {note && note.trim() !== '' ? note : '-'}
                                     </div>
                                   </div>
                                 </div>
                               </div>
+                              {pdfUrl && (
+                                <div className={`mt-3 pt-3 border-t ${currentTheme === 'dark' ? 'border-white/5' : 'border-gray-200'}`}>
+                                  <a
+                                    href={pdfUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`flex-shrink-0 inline-block px-4 py-2 rounded ${currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'} text-white font-medium transition-colors text-sm`}>
+                                    View PDF Statement
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
