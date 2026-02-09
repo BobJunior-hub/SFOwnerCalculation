@@ -534,46 +534,34 @@ export const useOwner = () => {
     }
 
     for (const item of trucksData) {
-      // If multiple drivers, validate each driver's amount
+      // If multiple drivers (team), at least one must have amount > 0; the other(s) can be 0
       if (
         item.drivers &&
         Array.isArray(item.drivers) &&
         item.drivers.length > 1
       ) {
+        let teamTotal = 0;
         for (const driver of item.drivers) {
           const driverAmount = driver.amount || "";
-          if (
-            !driverAmount ||
-            driverAmount === "" ||
-            driverAmount === "0" ||
-            driverAmount === 0
-          ) {
-            if (onError)
-              onError(
-                `Amount is required and cannot be 0 for ${
-                  driver.full_name || "Driver"
-                } in Unit ${item.unitNumber || item.truckId}.`
-              );
-            return;
-          }
-
           let amountValue = 0;
-          if (typeof driverAmount === "string") {
-            const cleaned = driverAmount.replace(/[^0-9.-]/g, "");
-            amountValue = parseFloat(cleaned) || 0;
-          } else {
-            amountValue = parseFloat(driverAmount) || 0;
+          if (driverAmount !== "" && driverAmount !== "0" && driverAmount !== 0) {
+            if (typeof driverAmount === "string") {
+              const cleaned = driverAmount.replace(/[^0-9.-]/g, "");
+              amountValue = parseFloat(cleaned) || 0;
+            } else {
+              amountValue = parseFloat(driverAmount) || 0;
+            }
           }
-
-          if (amountValue === 0 || isNaN(amountValue)) {
-            if (onError)
-              onError(
-                `Amount is required and cannot be 0 for ${
-                  driver.full_name || "Driver"
-                } in Unit ${item.unitNumber || item.truckId}.`
-              );
-            return;
-          }
+          teamTotal += amountValue;
+        }
+        if (teamTotal === 0 || isNaN(teamTotal)) {
+          if (onError)
+            onError(
+              `At least one driver must have an amount greater than 0 for Unit ${
+                item.unitNumber || item.truckId
+              } (team driver).`
+            );
+          return;
         }
       } else {
         const amountField = item.totalAmount || item.amount || "";
