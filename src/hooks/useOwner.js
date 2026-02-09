@@ -557,10 +557,11 @@ export const useOwner = () => {
         if (teamTotal === 0 || isNaN(teamTotal)) {
           if (onError)
             onError(
-              `At least one driver must have an amount greater than 0 for Unit ${
+              `At least one driver must have an amount greater than 0 for Unit. ${
                 item.unitNumber || item.truckId
               } (team driver).`
             );
+
           return;
         }
       } else {
